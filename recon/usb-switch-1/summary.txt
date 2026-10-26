@@ -1,0 +1,47 @@
+# Recon: usb-switch-1
+
+sysfs: /sys/devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10
+
+## Device
+  idVendor             057e
+  idProduct            2009
+  bcdDevice            0346
+  version              1.10
+  speed                12
+  product              Gamepad
+  bDeviceClass         00
+  bDeviceSubClass      00
+  bDeviceProtocol      00
+  bMaxPacketSize0      64
+  bNumConfigurations   1
+  bConfigurationValue  1
+  bNumInterfaces       1
+  bmAttributes         80
+  bMaxPower            500mA
+  busnum               1
+  devnum               12
+  devpath              10
+
+## Interface 1-10:1.0
+  bInterfaceNumber     00
+  bAlternateSetting    0
+  bInterfaceClass      03
+  bInterfaceSubClass   00
+  bInterfaceProtocol   00
+  bNumEndpoints        02
+  modalias             usb:v057Ep2009d0346dc00dsc00dp00ic03isc00ip00in00
+  driver               usbhid
+  ep_02: bEndpointAddress=02 bmAttributes=03 wMaxPacketSize=0040 bInterval=0a type=Interrupt direction=out interval=10ms
+  ep_82: bEndpointAddress=82 bmAttributes=03 wMaxPacketSize=0040 bInterval=01 type=Interrupt direction=in interval=1ms
+
+### HID 0003:057E:2009.000C (if00)
+  DRIVER=nintendo
+  HID_ID=0003:0000057E:00002009
+  HID_NAME=Gamepad
+  HID_PHYS=usb-0000:03:00.0-10/input0
+  HID_UNIQ=
+  MODALIAS=hid:b0003g0001v0000057Ep00002009
+  hidraw: hidraw0
+  input47: name='Gamepad' handlers=event3,js0
+  input48: name='Gamepad (IMU)' handlers=event2
+  report descriptor: 203 bytes -> rdesc-if00.bin / rdesc-if00.txt

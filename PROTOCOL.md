@@ -17,11 +17,27 @@ evidence behind each claim.
 |---|---|---|---|---|---|---|
 | 2.4 GHz dongle, controller off | (none linked) | 3537:0575 | 1.20 | 1 × HID (03/00/00) | `recon/dongle-ctrl-off/` | **confirmed**: the device disappeared when only the dongle was unplugged |
 | USB cable, controller off | n/a | (does not enumerate) | | | kernel log 2026-10-26 19:24 | **confirmed** |
+| USB cable | XInput (green LED) | 3537:1053 | 3.46 | if0 XInput (ff/5d/01, `xpad`) + if1 HID | `recon/usb-xinput-{1,2,3}/` (identical) | **confirmed** |
+| USB cable | Switch | 057e:2009 | 3.46 | 1 × HID (Pro Controller layout) | `recon/usb-switch-1/` | **confirmed** |
+| USB cable | DS4 (blue LED) | 054c:09cc | 3.46 | 1 × HID (DualShock 4 layout) | `recon/usb-ds4-{1,2}/` (identical) | **confirmed** |
 
 VID 0x3537 is "Guangzhou Chicken Run Network Technology Co., Ltd." (GameSir).
-The kernel reports `SerialNumber=0` (no serial string) for 3537:0575.
-*Guess:* bcdDevice 1.20 is the dongle firmware version. GameSir Connect
-bundles dongle images V119 and V121 (§5).
+In Switch and DS4 modes the controller borrows Nintendo's and Sony's IDs.
+Only XInput mode has a USB serial string (kept in git-ignored `private/`).
+
+**Firmware versions.** bcdDevice is the firmware version: 3.46 = controller
+V3.4.6, 1.20 = dongle V1.2.0. GameSir's FAQ quotes versions in this form
+("V1.1.9 or above for dongle, V3.4.4 or above for controller"), and the
+bundled images are named `GS_C2_ADC_DEVICE_V346`/`V352` and
+`GS_C2_Dongle_V119`/`V121` (§5). Confidence **medium**. It follows that
+GameSir Connect has newer images than both devices are running.
+
+**Mode switching (wired, firmware V3.4.6), observed 2026-10-26.** Holding
+View + Menu cycles XInput → Switch → DS4 → XInput, and each step
+re-enumerates the device. Home + X switched XInput → DS4 (blue). Home + Y
+flashed the LED but changed nothing; Home + A did nothing. This differs from
+GameSir's online manual. Power-on came up in XInput. Confidence **confirmed**
+(USB enumerations recorded by `tools/recon.py --watch`).
 
 ### 1.2 3537:0575 (dongle): single HID interface
 
@@ -51,10 +67,42 @@ Confidence: **confirmed** (read from the descriptors the kernel cached).
 Every vendor report is 64 bytes on the wire (ID + 63), which equals the
 endpoint size.
 
-### 1.3 Open questions
-- Which vendor channel (A: 0x41, or B: 0x0F/0x10/0x12) carries configuration,
-  and which carries firmware update? **Unknown.** Nothing is to be sent on
-  either until GameSir Connect's code maps them (step 3).
+### 1.3 3537:1053 (cable, XInput): interface 1 (HID)
+
+Evidence: `recon/usb-xinput-1/rdesc-if01.txt` (214 bytes).
+Confidence: **confirmed**.
+
+- Interface 0 is a standard XInput gamepad (EP 0x82 in / 0x02 out, 32 bytes),
+  bound to `xpad`. Gamepad data goes there, not over HID.
+- Interface 1: EP 0x84 interrupt IN, 64 bytes, 1 ms; EP 0x04 interrupt OUT,
+  64 bytes, 5 ms. No feature reports.
+
+| Collection | Usage page / usage | Report ID | Direction | Payload (bytes) |
+|---|---|---|---|---|
+| Keyboard | 0x0001 / 0x06 | 0x03 | In 8 (modifiers, reserved, 6 keys); Out 1 (3 LED bits) | |
+| Consumer | 0x000C | 0x02 | In | 4 (2 × 16-bit usages) |
+| Mouse | 0x0001 / 0x02 | 0x09 | In | 5 buttons, X/Y 16-bit rel, wheel 8-bit rel |
+| Vendor B | 0xFFF0 / 0x40 | 0x10 | In | 63 |
+| Vendor B | 0xFFF0 / 0x40 | 0x12 | In | 63 |
+| Vendor B | 0xFFF0 / 0x40 | 0x0F | Out | 63 |
+
+Vendor channel B is byte-for-byte the same collection as on the dongle (§1.2).
+*Guess:* the keyboard and mouse collections let button remaps emit
+keystrokes and mouse input.
+
+### 1.4 Which channel is configuration
+- Vendor channel **B** (0xFFF0: 0x0F out, 0x10/0x12 in) is present on the
+  controller in XInput mode and on the dongle. It is absent in Switch and DS4
+  modes. GameSir's FAQ says to use GameSir Connect "via dongle or Cable in
+  Xinput mode". *Guess* (medium): B is the GameSir Connect configuration
+  channel.
+- Vendor channel **A** (0xFF32: 0x41 in/out) appears only on the dongle.
+  *Guess:* it belongs to the dongle itself (pairing, its own settings or its
+  own update).
+- Firmware update may share these channels. Nothing is to be sent on either
+  until GameSir Connect's code maps the commands (step 3).
+
+### 1.5 Open questions
 - Does the dongle's descriptor change once a controller links to it, or
   does it always present only vendor channels? To check in step 1.4.
 

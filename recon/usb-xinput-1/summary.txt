@@ -1,0 +1,61 @@
+# Recon: usb-xinput-1
+
+sysfs: /sys/devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10
+
+## Device
+  idVendor             3537
+  idProduct            1053
+  bcdDevice            0346
+  version              2.00
+  speed                12
+  product              Xbox 360 Controller for Windows
+  serial               <redacted: private/serial.txt>
+  bDeviceClass         00
+  bDeviceSubClass      00
+  bDeviceProtocol      00
+  bMaxPacketSize0      64
+  bNumConfigurations   1
+  bConfigurationValue  1
+  bNumInterfaces       2
+  bmAttributes         80
+  bMaxPower            500mA
+  busnum               1
+  devnum               8
+  devpath              10
+
+## Interface 1-10:1.0
+  bInterfaceNumber     00
+  bAlternateSetting    0
+  bInterfaceClass      ff
+  bInterfaceSubClass   5d
+  bInterfaceProtocol   01
+  bNumEndpoints        02
+  modalias             usb:v3537p1053d0346dc00dsc00dp00icFFisc5Dip01in00
+  driver               xpad
+  ep_02: bEndpointAddress=02 bmAttributes=03 wMaxPacketSize=0020 bInterval=08 type=Interrupt direction=out interval=8ms
+  ep_82: bEndpointAddress=82 bmAttributes=03 wMaxPacketSize=0020 bInterval=01 type=Interrupt direction=in interval=1ms
+
+## Interface 1-10:1.1
+  bInterfaceNumber     01
+  bAlternateSetting    0
+  bInterfaceClass      03
+  bInterfaceSubClass   00
+  bInterfaceProtocol   00
+  bNumEndpoints        02
+  modalias             usb:v3537p1053d0346dc00dsc00dp00ic03isc00ip00in01
+  driver               usbhid
+  ep_04: bEndpointAddress=04 bmAttributes=03 wMaxPacketSize=0040 bInterval=05 type=Interrupt direction=out interval=5ms
+  ep_84: bEndpointAddress=84 bmAttributes=03 wMaxPacketSize=0040 bInterval=01 type=Interrupt direction=in interval=1ms
+  usbmisc: hiddev0
+
+### HID 0003:3537:1053.0009 (if01)
+  DRIVER=hid-generic
+  HID_ID=0003:00003537:00001053
+  HID_NAME=Xbox 360 Controller for Windows
+  HID_PHYS=usb-0000:03:00.0-10/input1
+  HID_UNIQ=<redacted>
+  MODALIAS=hid:b0003g0001v00003537p00001053
+  hidraw: hidraw0
+  input35: name='Xbox 360 Controller for Windows Keyboard' handlers=event2
+  input36: name='Xbox 360 Controller for Windows Mouse' handlers=event3
+  report descriptor: 214 bytes -> rdesc-if01.bin / rdesc-if01.txt

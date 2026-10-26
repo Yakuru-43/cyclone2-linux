@@ -1,0 +1,15 @@
+2026-10-26T19:42:24+01:00 Host-001 kernel: usb 1-10: USB disconnect, device number 11
+2026-10-26T19:42:25+01:00 Host-001 kernel: usb 1-10: new full-speed USB device number 12 using xhci_hcd
+2026-10-26T19:42:25+01:00 Host-001 kernel: usb 1-10: New USB device found, idVendor=057e, idProduct=2009, bcdDevice= 3.46
+2026-10-26T19:42:25+01:00 Host-001 kernel: usb 1-10: New USB device strings: Mfr=0, Product=2, SerialNumber=0
+2026-10-26T19:42:25+01:00 Host-001 kernel: usb 1-10: Product: Gamepad
+2026-10-26T19:42:25+01:00 Host-001 kernel: input: Gamepad as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:057E:2009.000C/input/input46
+2026-10-26T19:42:25+01:00 Host-001 kernel: hid-generic 0003:057E:2009.000C: input,hidraw0: USB HID v2.01 Joystick [Gamepad] on usb-0000:03:00.0-10/input0
+2026-10-26T19:42:25+01:00 Host-001 kernel: nintendo 0003:057E:2009.000C: hidraw0: USB HID v82.01 Joystick [Gamepad] on usb-0000:03:00.0-10/input0
+2026-10-26T19:42:25+01:00 Host-001 kernel: nintendo 0003:057E:2009.000C: controller MAC = D0:56:80:59:66:D5
+2026-10-26T19:42:25+01:00 Host-001 kernel: nintendo 0003:057E:2009.000C: using factory cal for left stick
+2026-10-26T19:42:25+01:00 Host-001 kernel: nintendo 0003:057E:2009.000C: using factory cal for right stick
+2026-10-26T19:42:25+01:00 Host-001 kernel: nintendo 0003:057E:2009.000C: using factory cal for IMU
+2026-10-26T19:42:25+01:00 Host-001 kernel: nintendo 0003:057E:2009.000C: assigned player 1 led pattern
+2026-10-26T19:42:25+01:00 Host-001 kernel: input: Gamepad (IMU) as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:057E:2009.000C/input/input48
+2026-10-26T19:42:25+01:00 Host-001 kernel: input: Gamepad as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:057E:2009.000C/input/input47

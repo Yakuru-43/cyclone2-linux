@@ -1,0 +1,49 @@
+# Recon: usb-ds4-2
+
+sysfs: /sys/devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10
+
+## Device
+  idVendor             054c
+  idProduct            09cc
+  bcdDevice            0346
+  version              2.00
+  speed                12
+  manufacturer         Guangzhou Chicken Run Network Technology Co., Ltd.
+  product              Wireless Controller
+  bDeviceClass         00
+  bDeviceSubClass      00
+  bDeviceProtocol      00
+  bMaxPacketSize0      64
+  bNumConfigurations   1
+  bConfigurationValue  1
+  bNumInterfaces       1
+  bmAttributes         80
+  bMaxPower            500mA
+  busnum               1
+  devnum               13
+  devpath              10
+
+## Interface 1-10:1.0
+  bInterfaceNumber     00
+  bAlternateSetting    0
+  bInterfaceClass      03
+  bInterfaceSubClass   00
+  bInterfaceProtocol   00
+  bNumEndpoints        02
+  modalias             usb:v054Cp09CCd0346dc00dsc00dp00ic03isc00ip00in00
+  driver               usbhid
+  ep_02: bEndpointAddress=02 bmAttributes=03 wMaxPacketSize=0040 bInterval=05 type=Interrupt direction=out interval=5ms
+  ep_82: bEndpointAddress=82 bmAttributes=03 wMaxPacketSize=0040 bInterval=01 type=Interrupt direction=in interval=1ms
+
+### HID 0003:054C:09CC.000D (if00)
+  DRIVER=playstation
+  HID_ID=0003:0000054C:000009CC
+  HID_NAME=Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller
+  HID_PHYS=usb-0000:03:00.0-10/input0
+  HID_UNIQ=<redacted>
+  MODALIAS=hid:b0003g0000v0000054Cp000009CC
+  hidraw: hidraw0
+  input49: name='Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller' handlers=js0,event2
+  input50: name='Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller Motion Sensors' handlers=event3
+  input51: name='Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller Touchpad' handlers=event23
+  report descriptor: 467 bytes -> rdesc-if00.bin / rdesc-if00.txt

@@ -1,0 +1,15 @@
+2026-10-26T19:35:09+01:00 Host-001 kernel: usb 1-10: USB disconnect, device number 8
+2026-10-26T19:35:10+01:00 Host-001 kernel: usb 1-10: new full-speed USB device number 9 using xhci_hcd
+2026-10-26T19:35:10+01:00 Host-001 kernel: usb 1-10: New USB device found, idVendor=3537, idProduct=1053, bcdDevice= 3.46
+2026-10-26T19:35:10+01:00 Host-001 kernel: usb 1-10: unable to read config index 0 descriptor/start: -71
+2026-10-26T19:35:10+01:00 Host-001 kernel: usb 1-10: can't read configurations, error -71
+2026-10-26T19:35:11+01:00 Host-001 kernel: usb 1-10: new full-speed USB device number 10 using xhci_hcd
+2026-10-26T19:35:11+01:00 Host-001 kernel: usb 1-10: New USB device found, idVendor=054c, idProduct=09cc, bcdDevice= 3.46
+2026-10-26T19:35:11+01:00 Host-001 kernel: usb 1-10: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+2026-10-26T19:35:11+01:00 Host-001 kernel: usb 1-10: Product: Wireless Controller
+2026-10-26T19:35:11+01:00 Host-001 kernel: usb 1-10: Manufacturer: Guangzhou Chicken Run Network Technology Co., Ltd.
+2026-10-26T19:35:11+01:00 Host-001 kernel: playstation 0003:054C:09CC.000A: hidraw0: USB HID v1.11 Gamepad [Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller] on usb-0000:03:00.0-10/input0
+2026-10-26T19:35:12+01:00 Host-001 kernel: input: Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:054C:09CC.000A/input/input39
+2026-10-26T19:35:12+01:00 Host-001 kernel: input: Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller Motion Sensors as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:054C:09CC.000A/input/input40
+2026-10-26T19:35:12+01:00 Host-001 kernel: input: Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller Touchpad as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:054C:09CC.000A/input/input41
+2026-10-26T19:35:12+01:00 Host-001 kernel: playstation 0003:054C:09CC.000A: Registered DualShock4 controller hw_version=0x0000b404 fw_version=0x0000a007

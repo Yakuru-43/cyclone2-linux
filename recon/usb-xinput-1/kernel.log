@@ -1,0 +1,10 @@
+2026-10-26T19:33:25+01:00 Host-001 kernel: usb 1-10: new full-speed USB device number 7 using xhci_hcd
+2026-10-26T19:33:27+01:00 Host-001 kernel: usb 1-10: new full-speed USB device number 8 using xhci_hcd
+2026-10-26T19:33:28+01:00 Host-001 kernel: usb 1-10: New USB device found, idVendor=3537, idProduct=1053, bcdDevice= 3.46
+2026-10-26T19:33:28+01:00 Host-001 kernel: usb 1-10: New USB device strings: Mfr=0, Product=2, SerialNumber=3
+2026-10-26T19:33:28+01:00 Host-001 kernel: usb 1-10: Product: Xbox 360 Controller for Windows
+2026-10-26T19:33:28+01:00 Host-001 kernel: usb 1-10: SerialNumber: <redacted>
+2026-10-26T19:33:28+01:00 Host-001 kernel: hid-generic 0003:3537:1053.0009: ignoring exceeding usage max
+2026-10-26T19:33:28+01:00 Host-001 kernel: input: Xbox 360 Controller for Windows Keyboard as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.1/0003:3537:1053.0009/input/input35
+2026-10-26T19:33:28+01:00 Host-001 kernel: input: Xbox 360 Controller for Windows Mouse as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.1/0003:3537:1053.0009/input/input36
+2026-10-26T19:33:28+01:00 Host-001 kernel: hid-generic 0003:3537:1053.0009: input,hiddev96,hidraw0: USB HID v1.10 Keyboard [Xbox 360 Controller for Windows] on usb-0000:03:00.0-10/input1
