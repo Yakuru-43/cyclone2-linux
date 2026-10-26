@@ -15,7 +15,8 @@ binaries or firmware.
 ## Status
 
 Tested on a Cyclone 2 with controller firmware V3.4.6 and dongle V1.2.0, on
-Bazzite (Fedora 44, kernel 7.2), over the USB cable in XInput mode.
+Bazzite (Fedora 44, kernel 7.2), over the USB cable and the 2.4 GHz dongle, in
+XInput mode.
 
 | Setting | Command | Verified |
 |---|---|---|
@@ -28,9 +29,10 @@ Bazzite (Fedora 44, kernel 7.2), over the USB cable in XInput mode.
 | Switch the active profile | `profile` | on device |
 | Vibration strength | `set vibration` | on device, by feel |
 
-The 2.4 GHz dongle exposes the same configuration channel (3537:100b) and
-should work, but it has not yet been tested with this tool. Bluetooth is not
-supported.
+It also works through the **2.4 GHz dongle** (3537:100b; tested: info, full
+read, brightness write). Commands are paced, because the radio occasionally
+drops one. Reads are retried, and writes are verified and resent once if
+they did not land. Bluetooth is not supported.
 
 ## Install (Bazzite / Fedora Atomic)
 

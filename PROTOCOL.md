@@ -200,6 +200,21 @@ write on the factory baseline reproduced the device's state with zero
 unexplained bytes. So writes land exactly at (bank, offset), and the proxy
 captured every write.
 
+**Through the dongle (3537:100b)**, tested 2026-10-26 with our CLI
+(`captures/30-…` to `36-…`):
+- The FW-version reply carries both halves: `10 0A 30 00 33 00 34 00 36 00
+  30 00 31 00 32 00 30 00` (controller "0346", dongle "0120").
+- Full reads match the cable byte for byte, and writes work (brightness test,
+  seen by the owner).
+- Replies take a median of 24 ms (34 ms max), against about 5 ms on the
+  cable.
+- **Commands are dropped** if sent right after the previous reply. With a
+  gap they are still occasionally lost: about 1 in 70–140 packets, so a
+  radio drop rather than a timing issue.
+- Our device layer therefore waits 20 ms between sends and 20 ms after each
+  reply. It retries reads up to 2 times, and resends a write or profile
+  switch once only if a read-back shows it did not take.
+
 ### 2.3 Device → host replies (byte 1 of report 0x10)
 
 Decoder `wo`, l. 15277:
