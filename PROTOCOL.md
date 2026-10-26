@@ -310,7 +310,11 @@ The 7-byte key block, then macro data:
 
 - Deadzones are stored as the UI percentages. GSC's defaults are
   5 / 95 / 0 / 100.
-- Hair trigger status = `0x80 | mode` (mode 1 or 2), or 0 when off.
+- Hair trigger status = `0x80 | mode`, or 0 when off. **Confirmed by
+  capture 05:** GSC's "Adaptive mode" wrote `0F 03 01 01 FA 01 81` and "OFF"
+  wrote `…01 00`, so mode 1 = Adaptive. *Guess (high):* mode 2 = GSC's
+  "Fixed mode", the only other option in the UI. Factory devices store 0x01
+  (off, mode 1 remembered).
 - So the **LT deadzone** is at 0x1F1 (front) and 0x1F2 (back), and the
   **RT deadzone** at 0x20D / 0x20E.
 
