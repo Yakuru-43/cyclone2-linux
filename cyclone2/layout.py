@@ -145,3 +145,15 @@ def key_map(bank, key):
         raise ValueError("bank must be 1-5")
     return Field(f"profile{bank}.key.{key}.map", bank, 0x040 + 7 * KEYS.index(key) + 2,
                  2, 0, 0x1C)
+
+
+MOTOR_RAW = {0: 0, 1: 25, 2: 50, 3: 75, 4: 100}  # GSC levels -> stored bytes
+MOTORS = {"left": 0x020, "right": 0x021}
+
+
+def motors(bank):
+    """Left and right rumble motor strength in one profile bank (0x020-0x021)."""
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.vibration", bank, 0x020, 2, 0, 100,
+                 frozenset(MOTOR_RAW.values()))

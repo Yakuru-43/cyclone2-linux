@@ -13,9 +13,11 @@ import time
 from . import protocol as P
 from .device import CONFIG_PIDS, Cyclone2, DeviceError, find
 from .keycodes import KEY_CODES, KEY_NAMES
-from .layout import (HAIR_TRIGGER_MODES, KEYS, LIGHT_BANK, LIGHT_ZONES, PROFILE_BANKS,
-                     STICKS, TRIGGERS, decode_light, decode_profile, hair_trigger, key_map,
-                     light_brightness, light_color, stick_deadzone, trigger_deadzone)
+from .layout import (HAIR_TRIGGER_MODES, KEYS, LIGHT_BANK, LIGHT_ZONES, MOTOR_RAW, MOTORS,
+                     PROFILE_BANKS, STICKS, TRIGGERS, decode_light, decode_profile,
+                     hair_trigger, key_map, light_brightness, light_color, motors,
+                     stick_deadzone, trigger_deadzone)
+from .rumble import find_event_node, rumble
 
 ALL_BANKS = (*PROFILE_BANKS, LIGHT_BANK)
 
@@ -25,7 +27,8 @@ APPROVED_WRITES = [light_brightness(e) for e in range(5)] + [
     stick_deadzone(b, s) for b in PROFILE_BANKS for s in STICKS] + [
     trigger_deadzone(b, t) for b in PROFILE_BANKS for t in TRIGGERS] + [
     hair_trigger(b, t) for b in PROFILE_BANKS for t in TRIGGERS] + [
-    key_map(b, k) for b in PROFILE_BANKS for k in KEYS]
+    key_map(b, k) for b in PROFILE_BANKS for k in KEYS] + [
+    motors(b) for b in PROFILE_BANKS]
 LIGHT_SETTINGS = ("brightness", "color")
 # Remap targets: gamepad buttons and stick directions (keyboard/mouse later).
 MAP_TARGETS = {name: code for name, code in KEY_CODES.items() if 0x01 <= code <= 0x1C}
@@ -172,6 +175,13 @@ def profile_plan(args, bank):
         f = (stick_deadzone if target in STICKS else trigger_deadzone)(bank, target)
         data = bytes([inner] if outer is None else [inner, outer])
         return f, (f.offset - 1, 3), data  # enable, inner, outer
+    if args.setting == "vibration":
+        side, level = args.value
+        f = motors(bank)
+        if side is None:
+            return f, (f.offset, 2), bytes([MOTOR_RAW[level]] * 2)
+        return (f._replace(offset=MOTORS[side], length=1), (f.offset, 2),
+                bytes([MOTOR_RAW[level]]))
     if args.setting == "map":
         key, target = args.value
         f = key_map(bank, key)
@@ -195,6 +205,13 @@ def cmd_set_profile_setting(dev, args):
         if not data[0] < outer:
             raise DeviceError(f"the inner deadzone must be below the outer one ({outer})")
         change = f"{old_inner}-{old_outer} -> {data[0]}-{outer}"
+    elif args.setting == "vibration":
+        levels = {v: k for k, v in MOTOR_RAW.items()}
+        lv = lambda raw: str(levels.get(raw, f"raw {raw}"))
+        new = bytearray(old)
+        new[f.offset - 0x020:f.offset - 0x020 + len(data)] = data
+        change = (f"left {lv(old[0])}, right {lv(old[1])} -> "
+                  f"left {lv(new[0])}, right {lv(new[1])} (levels 0-4)")
     elif args.setting == "map":
         key = args.value[0]
         def output(en, code):
@@ -215,6 +232,12 @@ def cmd_profile(dev, path, pid, args):
     if now != args.number:
         raise DeviceError(f"asked for profile {args.number}, controller reports {now}")
     print(f"active profile: {old} -> {now}")
+
+
+def cmd_rumble(path, args):
+    node = find_event_node(path)
+    print(f"rumble on {node}: strong {args.strong}%, weak {args.weak}%, {args.ms} ms")
+    rumble(node, args.strong, args.weak, args.ms)
 
 
 def cmd_set(dev, path, pid, args):
@@ -249,6 +272,16 @@ def hair_trigger_value(text):
         raise argparse.ArgumentTypeError(
             f"use lt|rt={'|'.join(HAIR_TRIGGER_MODES)} (fixed mode is not confirmed yet)")
     return trigger, mode
+
+
+def vibration_value(text):
+    """'3' (both motors) or 'left=2' / 'right=4' -> (side or None, level)."""
+    side, _, level = text.rpartition("=")
+    if side not in ("", *MOTORS):
+        raise argparse.ArgumentTypeError("use LEVEL, left=LEVEL or right=LEVEL")
+    if level not in ("0", "1", "2", "3", "4"):
+        raise argparse.ArgumentTypeError("level must be 0-4")
+    return side or None, int(level)
 
 
 def map_value(text):
@@ -334,11 +367,12 @@ def main(argv=None):
     b.add_argument("file")
     st = sub.add_parser("set", help="change one setting (writes to the controller)")
     st.add_argument("setting", choices=["brightness", "color", "deadzone", "hair-trigger",
-                                        "map"])
+                                        "map", "vibration"])
     st.add_argument("value", help="brightness: 0-100\ncolor: ZONE=#RRGGBB, ZONE in "
                     + ", ".join(LIGHT_ZONES) + "\ndeadzone: left|right|lt|rt=INNER[:OUTER]"
                     "\nhair-trigger: lt|rt=" + "|".join(HAIR_TRIGGER_MODES)
-                    + "\nmap: BUTTON=TARGET (BUTTON=BUTTON resets it)")
+                    + "\nmap: BUTTON=TARGET (BUTTON=BUTTON resets it)"
+                    + "\nvibration: LEVEL | left=LEVEL | right=LEVEL (0-4)")
     st.add_argument("--profile", type=profile_bank, metavar="1-4|shift",
                     help="profile for deadzone / hair-trigger / map (default: the active one)")
     st.add_argument("--frame", type=lambda t: int(t) - 1, default=0, metavar="1-8",
@@ -347,6 +381,10 @@ def main(argv=None):
                     help="lighting effect (default: the active one)")
     pr = sub.add_parser("profile", help="switch the active profile (1-4)")
     pr.add_argument("number", type=int, choices=[1, 2, 3, 4])
+    ru = sub.add_parser("rumble", help="test rumble like a game would (xpad force feedback)")
+    ru.add_argument("--strong", type=percent, default=100, help="left/large motor, %%")
+    ru.add_argument("--weak", type=percent, default=100, help="right/small motor, %%")
+    ru.add_argument("--ms", type=int, default=1000, help="duration (default 1000)")
     r = sub.add_parser("restore", help="write back a backup (only differing bytes)")
     r.add_argument("file")
     r.add_argument("--plan", action="store_true",
@@ -357,7 +395,8 @@ def main(argv=None):
             args.value = {"brightness": percent, "color": zone_color,
                           "deadzone": deadzone_value,
                           "hair-trigger": hair_trigger_value,
-                          "map": map_value}[args.setting](args.value)
+                          "map": map_value,
+                          "vibration": vibration_value}[args.setting](args.value)
         except (argparse.ArgumentTypeError, ValueError) as e:
             ap.error(f"set {args.setting}: {e}")
 
@@ -368,6 +407,18 @@ def main(argv=None):
             ap.error("--dry-run needs --effect (the active one is read from the device)")
         if args.setting not in LIGHT_SETTINGS and args.profile is None:
             ap.error("--dry-run needs --profile (the active one is read from the device)")
+    if args.cmd == "rumble":
+        if args.dry_run:
+            print("dry run: rumble sends no vendor-channel packets; it plays a kernel "
+                  "force-feedback effect on the controller's XInput event device")
+            return 0
+        devices = find()
+        if len(devices) != 1:
+            print(f"error: need exactly one Cyclone 2, found {devices or 'none'}",
+                  file=sys.stderr)
+            return 1
+        cmd_rumble(devices[0][0], args)
+        return 0
     if args.dry_run:
         show_dry_run(args)
         return 0

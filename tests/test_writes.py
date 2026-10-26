@@ -112,9 +112,9 @@ class Deadzone(unittest.TestCase):
     def run_set(self, value, profile=None, setting="deadzone"):
         from argparse import Namespace
         from cyclone2.cli import cmd_set, deadzone_value, hair_trigger_value, planned_packets
-        from cyclone2.cli import map_value
+        from cyclone2.cli import map_value, vibration_value
         parse = {"deadzone": deadzone_value, "hair-trigger": hair_trigger_value,
-                 "map": map_value}[setting]
+                 "map": map_value, "vibration": vibration_value}[setting]
         args = Namespace(cmd="set", setting=setting, value=parse(value), profile=profile)
         dev = FakeDevice(self.banks)
         cmd_set(dev, None, None, args)
@@ -181,3 +181,23 @@ class SwitchProfile(unittest.TestCase):
 
     def test_matches_capture_04(self):
         self.assertEqual(P.switch_profile(2)[:3].hex(" "), "0f 07 02")
+
+
+class Vibration(Deadzone):
+    def test_dry_runs_equal_sent(self):
+        for value in ("0", "3", "left=2", "right=4"):
+            dev, planned = self.run_set(value, setting="vibration")
+            self.assertEqual(dev.sent, planned, value)
+            for pkt in dev.sent:
+                self.assertIsNone(policy(pkt), pkt[:8].hex(" "))
+
+    def test_bytes(self):
+        dev, _ = self.run_set("0", setting="vibration")
+        self.assertEqual(dev.sent[2][:8].hex(" "), "0f 03 01 00 20 02 00 00")
+        dev, _ = self.run_set("right=4", setting="vibration")
+        self.assertEqual(dev.sent[2][:7].hex(" "), "0f 03 01 00 21 01 64")
+
+    def test_only_gsc_levels(self):
+        for v in (1, 26, 99, 101, 255):
+            self.assertIsNotNone(policy(P.write_chunk(1, 0x020, [v])), v)
+        self.assertIsNotNone(policy(P.write_chunk(1, 0x022, [75])))   # trigger motors: no
