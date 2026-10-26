@@ -39,7 +39,7 @@ they did not land. Bluetooth is not supported.
 No system packages and no `rpm-ostree` needed:
 
 ```sh
-git clone <this repository> cyclone2 && cd cyclone2
+git clone https://github.com/Yakuru-43/cyclone2-linux.git && cd cyclone2-linux
 pip install --user .          # installs `cyclone2` into ~/.local/bin, plus hidapi
 ```
 

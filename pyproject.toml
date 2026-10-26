@@ -12,6 +12,10 @@ requires-python = ">=3.9"
 # cython-hidapi; cyclone2 uses its hidraw backend (`import hidraw`)
 dependencies = ["hidapi>=0.14"]
 
+[project.urls]
+Homepage = "https://github.com/Yakuru-43/cyclone2-linux"
+Protocol = "https://github.com/Yakuru-43/cyclone2-linux/blob/main/PROTOCOL.md"
+
 [project.scripts]
 cyclone2 = "cyclone2.cli:main"
 
