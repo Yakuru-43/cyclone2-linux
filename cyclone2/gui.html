@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyclone 2</title>
+<style>
+:root {
+  --bg: #f4f5f7; --card: #ffffff; --text: #1d2026; --muted: #6b7280; --line: #e3e5e9;
+  --accent: #d6303f; --accent-text: #ffffff; --changed: #f59e0b; --ok: #16a34a; --bad: #dc2626;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #15171c; --card: #1e2128; --text: #e7e9ee; --muted: #9aa1ad; --line: #2c3039;
+          --accent: #e5484d; --changed: #fbbf24; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+       background: var(--bg); color: var(--text); }
+header { display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+         background: var(--card); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+.chip { font-size: 12px; color: var(--muted); border: 1px solid var(--line);
+        border-radius: 999px; padding: 2px 10px; }
+.spacer { flex: 1; }
+button, select, input[type=number] { font: inherit; color: inherit; }
+button { background: transparent; border: 1px solid var(--line); border-radius: 8px;
+         padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+button:disabled { opacity: .5; cursor: default; }
+.profiles { display: flex; align-items: center; gap: 8px; padding: 12px 20px; flex-wrap: wrap; }
+.profiles button { min-width: 92px; }
+.profiles button.editing { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.profiles .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+                 background: var(--ok); margin-left: 6px; vertical-align: middle; }
+main { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+       gap: 14px; padding: 0 20px 90px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted);
+           margin: 0 0 10px; font-weight: 600; }
+.card .note { font-size: 12px; color: var(--muted); margin: -4px 0 10px; }
+.row { display: grid; grid-template-columns: 110px 1fr 42px; align-items: center; gap: 10px;
+       padding: 5px 0; }
+.row label { color: var(--muted); }
+.row .val { text-align: right; font-variant-numeric: tabular-nums; }
+.row.changed label { color: var(--changed); }
+.row.changed label::after { content: " •"; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=color] { width: 44px; height: 28px; border: 1px solid var(--line); border-radius: 6px;
+                    background: none; padding: 2px; cursor: pointer; }
+select { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 4px 12px; }
+.seg button.on { background: var(--accent); color: var(--accent-text); }
+.keys { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 16px; }
+.keys .row { grid-template-columns: 54px 1fr; }
+.sub { font-weight: 600; margin: 10px 0 2px; font-size: 13px; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; display: none; align-items: center; gap: 10px;
+       padding: 12px 20px; background: var(--card); border-top: 1px solid var(--line); }
+.bar.show { display: flex; }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
+           align-items: center; justify-content: center; padding: 20px; z-index: 5; }
+.overlay.show { display: flex; }
+.modal { background: var(--card); border-radius: 14px; width: min(640px, 100%); max-height: 85vh;
+         display: flex; flex-direction: column; border: 1px solid var(--line); }
+.modal h3 { margin: 0; padding: 16px 18px 6px; font-size: 16px; }
+.modal .body { padding: 6px 18px; overflow: auto; }
+.modal .foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px 16px; }
+.item { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.item code { display: block; font: 12px var(--mono); color: var(--muted); margin-top: 3px;
+             word-break: break-all; }
+.toast { position: fixed; right: 20px; bottom: 76px; background: var(--text); color: var(--bg);
+         padding: 10px 14px; border-radius: 10px; opacity: 0; transition: opacity .2s;
+         pointer-events: none; max-width: 420px; z-index: 6; }
+.toast.show { opacity: .95; }
+.toast.bad { background: var(--bad); color: #fff; }
+.empty { text-align: center; padding: 70px 20px; color: var(--muted); grid-column: 1 / -1; }
+.busy { cursor: progress; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cyclone 2</h1>
+  <span class="chip" id="status">connecting…</span>
+  <span class="spacer"></span>
+  <button id="rumble" title="1-second test rumble at full strength">Test rumble</button>
+  <button id="backup">Back up…</button>
+  <button id="restore">Restore…</button>
+  <button id="reload" title="Read the controller again">Reload</button>
+  <input type="file" id="restore-file" accept=".json,application/json" hidden>
+</header>
+<div class="profiles" id="profiles"></div>
+<main id="main"><div class="empty">Reading the controller…</div></main>
+<div class="bar" id="bar">
+  <span id="pending"></span><span class="spacer"></span>
+  <button id="discard">Discard</button>
+  <button class="primary" id="review">Review &amp; apply</button>
+</div>
+<div class="overlay" id="overlay"><div class="modal">
+  <h3 id="m-title"></h3>
+  <div class="body" id="m-body"></div>
+  <div class="foot"><button id="m-cancel">Cancel</button>
+    <button class="primary" id="m-ok">Apply</button></div>
+</div></div>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+const $ = (id) => document.getElementById(id);
+const el = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v; else if (k.startsWith("on")) e[k] = v;
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids) e.append(k);
+  return e;
+};
+const KEY_LABEL = { LSUp: "LS ↑", LSDown: "LS ↓", LSLeft: "LS ←", LSRight: "LS →",
+                    RSUp: "RS ↑", RSDown: "RS ↓", RSLeft: "RS ←", RSRight: "RS →" };
+let state = null, edits = {}, plan = null, editing = null;
+
+async function api(route, body = {}) {
+  const r = await fetch(route, { method: "POST", headers: {
+    "Content-Type": "application/json", "X-Cyclone2-Token": TOKEN }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+function toast(msg, bad = false) {
+  const t = $("toast"); t.textContent = msg; t.className = "toast show" + (bad ? " bad" : "");
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.className = "toast", bad ? 6000 : 2500);
+}
+async function busy(fn) {
+  document.body.classList.add("busy");
+  try { return await fn(); } catch (e) { toast(e.message, true); } finally {
+    document.body.classList.remove("busy"); }
+}
+
+// ---- edits ---------------------------------------------------------------
+function get(path) { return path.reduce((o, k) => o == null ? undefined : o[k], edits); }
+function current(path) {           // edited value if any, else the controller's
+  const e = get(path); return e !== undefined ? e : path.reduce((o, k) => o[k], state);
+}
+function setEdit(path, value) {
+  const base = path.reduce((o, k) => o[k], state);
+  let o = edits;
+  for (const k of path.slice(0, -1)) o = o[k] ??= {};
+  if (value === base) delete o[path.at(-1)]; else o[path.at(-1)] = value;
+  prune(edits); refreshPending();
+}
+function prune(o) {
+  for (const k of Object.keys(o)) if (typeof o[k] === "object") {
+    prune(o[k]); if (!Object.keys(o[k]).length) delete o[k]; }
+}
+function count(o) { return Object.values(o).reduce((n, v) => n + (typeof v === "object" ? count(v) : 1), 0); }
+function refreshPending() {
+  const n = count(edits);
+  $("bar").classList.toggle("show", n > 0);
+  $("pending").textContent = `${n} unsaved change${n === 1 ? "" : "s"} on profile ${state.profile}` +
+    (edits.light ? " (lighting applies to all profiles)" : "");
+  document.querySelectorAll("[data-path]").forEach((row) => row.classList.toggle(
+    "changed", get(JSON.parse(row.dataset.path)) !== undefined));
+}
+
+// ---- rendering -------------------------------------------------------------
+function slider(label, path, min, max, onInput) {
+  const val = el("span", { class: "val" }, String(current(path)));
+  const input = el("input", { type: "range", min, max, value: current(path) });
+  input.oninput = () => { val.textContent = input.value; setEdit(path, +input.value); onInput?.(); };
+  return el("div", { class: "row", "data-path": JSON.stringify(path) }, el("label", {}, label), input, val);
+}
+function deadzone(title, group, name) {
+  const d = state[group][name];
+  if (!d.enabled) return el("div", { class: "note" }, `${title}: deadzone disabled in this profile`);
+  const inner = slider("Inner", [group, name, "inner"], 0, 99);
+  const outer = slider("Outer", [group, name, "outer"], 1, 100);
+  return el("div", {}, el("div", { class: "sub" }, title), inner, outer);
+}
+function segmented(path, options) {
+  const wrap = el("div", { class: "seg" });
+  const draw = () => wrap.querySelectorAll("button").forEach(
+    (b) => b.classList.toggle("on", b.dataset.v === String(current(path))));
+  for (const [v, text] of options) wrap.append(el("button", { "data-v": v, onclick: () => {
+    setEdit(path, isNaN(+v) ? v : +v); draw(); } }, text));
+  draw();
+  return wrap;
+}
+function render() {
+  const s = state;
+  const dev = s.device;
+  $("status").textContent = `${dev.connection} · controller ${dev.firmware}` +
+    (dev.dongle_firmware ? ` · dongle ${dev.dongle_firmware}` : "");
+  const prof = $("profiles"); prof.replaceChildren(el("span", { class: "chip" }, "Editing"));
+  for (const n of [1, 2, 3, 4]) {
+    const b = el("button", { class: n === s.profile ? "editing" : "", onclick: () => load(n) },
+                 `Profile ${n}`);
+    if (n === s.active_profile) b.append(el("span", { class: "dot", title: "active on the controller" }));
+    prof.append(b);
+  }
+  if (s.profile !== s.active_profile) prof.append(el("button", { onclick: makeActive },
+    `Make profile ${s.profile} active`));
+
+  const light = el("section", { class: "card" }, el("h2", {}, "Lighting"),
+    el("div", { class: "note" }, `Effect ${"I II III IV V".split(" ")[s.light.effect]} · shared by all profiles`),
+    slider("Brightness", ["light", "brightness"], 0, 100));
+  for (const [zone, label] of Object.entries(s.zones)) {
+    const path = ["light", "colors", zone];
+    const input = el("input", { type: "color", value: current(path) });
+    input.oninput = () => setEdit(path, input.value);
+    light.append(el("div", { class: "row", "data-path": JSON.stringify(path) },
+                    el("label", {}, label), input, el("span")));
+  }
+
+  const sticks = el("section", { class: "card" }, el("h2", {}, "Sticks"),
+    deadzone("Left stick", "sticks", "left"), deadzone("Right stick", "sticks", "right"));
+
+  const triggers = el("section", { class: "card" }, el("h2", {}, "Triggers"));
+  for (const [t, name] of [["lt", "LT"], ["rt", "RT"]]) {
+    triggers.append(deadzone(name, "triggers", t));
+    const hair = s.triggers[t].hair;
+    triggers.append(el("div", { class: "row", "data-path": JSON.stringify(["triggers", t, "hair"]) },
+      el("label", {}, "Hair trigger"),
+      ["off", "adaptive"].includes(hair)
+        ? segmented(["triggers", t, "hair"], [["off", "Off"], ["adaptive", "Adaptive"]])
+        : el("span", { class: "note" }, hair), el("span")));
+  }
+
+  const vib = el("section", { class: "card" }, el("h2", {}, "Vibration"));
+  for (const side of ["left", "right"]) {
+    const path = ["vibration", side];
+    vib.append(s.vibration[side] === null
+      ? el("div", { class: "note" }, `${side} motor: non-standard value`)
+      : slider(side === "left" ? "Left motor" : "Right motor", path, 0, 4));
+  }
+  vib.append(el("div", { class: "note" }, "Levels 0–4, as in GameSir Connect. 0 turns rumble off."));
+
+  const keys = el("div", { class: "keys" });
+  for (const k of Object.keys(s.map)) {
+    const path = ["map", k];
+    const sel = el("select");
+    if (s.map[k] === null) sel.append(el("option", { value: "", disabled: true, selected: true }, "(custom)"));
+    sel.append(el("option", { value: k }, `${k} (itself)`));
+    for (const t of s.map_targets) if (t !== k) sel.append(el("option", { value: t }, KEY_LABEL[t] || t));
+    if (s.map[k] !== null) sel.value = current(path);
+    sel.onchange = () => setEdit(path, sel.value);
+    keys.append(el("div", { class: "row", "data-path": JSON.stringify(path) }, el("label", {}, k), sel));
+  }
+  const buttons = el("section", { class: "card" }, el("h2", {}, "Buttons"), keys);
+
+  $("main").replaceChildren(light, sticks, triggers, vib, buttons);
+  refreshPending();
+}
+
+// ---- actions -------------------------------------------------------------
+async function load(profile = editing) {
+  if (count(edits) && !confirm("Discard unsaved changes?")) return;
+  await busy(async () => {
+    try {
+      state = await api("/api/state", profile ? { profile } : {});
+    } catch (e) {
+      $("main").replaceChildren(el("div", { class: "empty" }, e.message,
+        el("br"), el("br"), el("button", { onclick: () => load(profile) }, "Retry")));
+      $("status").textContent = "not connected"; $("profiles").replaceChildren();
+      $("bar").classList.remove("show"); state = null; return;
+    }
+    editing = state.profile; edits = {}; render();
+  });
+}
+function showPlan(title, p, done) {
+  if (!p.items.length) { toast("Nothing to change."); return; }
+  plan = { ...p, done };
+  $("m-title").textContent = title;
+  $("m-body").replaceChildren(el("div", { class: "note" },
+    "These exact packets will be sent. Each write is read back to verify it."),
+    ...p.items.map((i) => el("div", { class: "item" }, i.label, el("code", {}, i.packet.toUpperCase()))));
+  $("m-ok").disabled = false;
+  $("overlay").classList.add("show");
+}
+function closePlan() { $("overlay").classList.remove("show"); plan = null; }
+async function applyPlan() {
+  if (!plan) return;
+  $("m-ok").disabled = true;
+  const p = plan;
+  await busy(async () => {
+    try {
+      const r = await api("/api/apply", { id: p.id });
+      closePlan(); toast(`Done: ${r.applied} change${r.applied === 1 ? "" : "s"} written and verified.`);
+      edits = {}; await p.done();
+    } catch (e) { $("m-ok").disabled = false; throw e; }
+  });
+}
+async function review() {
+  await busy(async () => showPlan("Review changes",
+    await api("/api/plan", { profile: state.profile, ...edits }), () => load(state.profile)));
+}
+async function makeActive() {
+  await busy(async () => showPlan(`Make profile ${state.profile} active`,
+    await api("/api/plan-profile", { profile: state.profile }), () => load(state.profile)));
+}
+async function doBackup() {
+  await busy(async () => {
+    const data = await api("/api/backup");
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+    const a = el("a", { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)],
+      { type: "application/json" })), download: `cyclone2-backup-${stamp}.json` });
+    document.body.append(a); a.click(); a.remove();
+    toast("Backup saved (all profiles and lighting).");
+  });
+}
+async function doRestore(file) {
+  if (!file) return;
+  await busy(async () => {
+    let doc;
+    try { doc = JSON.parse(await file.text()); } catch { throw new Error("Not a JSON file."); }
+    showPlan(`Restore ${file.name}`, await api("/api/plan-restore", doc), () => load(state?.profile));
+  });
+  $("restore-file").value = "";
+}
+
+$("reload").onclick = () => load();
+$("discard").onclick = () => { edits = {}; render(); };
+$("review").onclick = review;
+$("m-cancel").onclick = closePlan;
+$("m-ok").onclick = applyPlan;
+$("backup").onclick = doBackup;
+$("restore").onclick = () => $("restore-file").click();
+$("restore-file").onchange = (e) => doRestore(e.target.files[0]);
+$("rumble").onclick = () => busy(async () => { await api("/api/rumble"); toast("Rumble sent."); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePlan(); });
+window.addEventListener("beforeunload", (e) => { if (count(edits)) e.preventDefault(); });
+setInterval(() => api("/api/ping").catch(() => {}), 3000);
+load();
+</script>
+</body>
+</html>

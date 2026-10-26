@@ -9,11 +9,11 @@ from . import protocol as P
 GAMESIR_VID = 0x3537
 CONFIG_PIDS = {0x1053: "cable", 0x100B: "dongle"}
 CONFIG_USAGE_PAGE = 0xFFF0
-# GSC sends a command about every 20 ms. Through the dongle, a command sent
-# right after the previous reply is dropped (2026-10-26, captures/31-…, 32-…),
-# so also keep a gap after each reply.
-MIN_INTERVAL = 0.02
-GAP_AFTER_REPLY = 0.02
+# Through the dongle, a command sent right after the previous reply is
+# dropped (2026-10-26, captures/31-…, 32-…), so pace like GSC (about one
+# command per 20 ms) and keep a gap after each reply. The cable needs neither.
+DONGLE_MIN_INTERVAL = 0.02
+DONGLE_GAP_AFTER_REPLY = 0.02
 READ_RETRIES = 2  # only for commands that change nothing
 
 
@@ -29,12 +29,14 @@ def find():
 
 
 class Cyclone2:
-    def __init__(self, path, policy=P.check_read_only, log=None):
+    def __init__(self, path, policy=P.check_read_only, log=None, dongle=False):
         self.path = path
         self.policy = policy
         self.log = log
         self.dev = hidraw.Device(path)
         self.last_send = self.last_reply = 0.0
+        self.min_interval = DONGLE_MIN_INTERVAL if dongle else 0.0
+        self.gap_after_reply = DONGLE_GAP_AFTER_REPLY if dongle else 0.0
 
     def close(self):
         self.dev.close()
@@ -49,8 +51,8 @@ class Cyclone2:
         why = self.policy(pkt)
         if why:
             raise DeviceError(f"refused to send {pkt[:8].hex(' ')}: {why}")
-        wait = max(self.last_send + MIN_INTERVAL,
-                   self.last_reply + GAP_AFTER_REPLY) - time.monotonic()
+        wait = max(self.last_send + self.min_interval,
+                   self.last_reply + self.gap_after_reply) - time.monotonic()
         if wait > 0:
             time.sleep(wait)
         if self.log:

@@ -21,3 +21,6 @@ cyclone2 = "cyclone2.cli:main"
 
 [tool.setuptools]
 packages = ["cyclone2"]
+
+[tool.setuptools.package-data]
+cyclone2 = ["gui.html"]

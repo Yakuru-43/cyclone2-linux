@@ -19,29 +19,9 @@ from .layout import (HAIR_TRIGGER_MODES, KEYS, LIGHT_BANK, LIGHT_ZONES, MOTOR_RA
                      hair_trigger, key_map, light_brightness, light_color, motors,
                      stick_deadzone, trigger_deadzone)
 from .rumble import find_event_node, rumble
+from .settings import APPROVED_WRITES, LIGHT_SETTINGS, MAP_TARGETS, policy  # noqa: F401
 
 ALL_BANKS = (*PROFILE_BANKS, LIGHT_BANK)
-
-# Field kinds the owner has approved for writing, one kind at a time (step 6).
-APPROVED_WRITES = [light_brightness(e) for e in range(5)] + [
-    light_color(e, f, z) for e in range(5) for f in range(8) for z in range(5)] + [
-    stick_deadzone(b, s) for b in PROFILE_BANKS for s in STICKS] + [
-    trigger_deadzone(b, t) for b in PROFILE_BANKS for t in TRIGGERS] + [
-    hair_trigger(b, t) for b in PROFILE_BANKS for t in TRIGGERS] + [
-    key_map(b, k) for b in PROFILE_BANKS for k in KEYS] + [
-    motors(b) for b in PROFILE_BANKS]
-LIGHT_SETTINGS = ("brightness", "color")
-# Remap targets: gamepad buttons and stick directions (keyboard/mouse later).
-MAP_TARGETS = {name: code for name, code in KEY_CODES.items() if 0x01 <= code <= 0x1C}
-
-
-def policy(pkt):
-    if pkt[1:2] == bytes([P.OP_WRITE]):
-        return P.check_write(pkt, APPROVED_WRITES)
-    if pkt[1:2] == bytes([P.OP_SWITCH_PROFILE]):
-        return P.check_switch_profile(pkt)
-    return P.check_read_only(pkt)
-
 
 def bank_name(bank):
     return "light" if bank == LIGHT_BANK else "shift" if bank == 5 else f"profile {bank}"
@@ -108,7 +88,7 @@ def open_device(args, log):
         raise DeviceError(f"need exactly one Cyclone 2 in XInput mode (cable or "
                           f"dongle), found {devices or 'none'}")
     path, pid = devices[0]
-    return Cyclone2(path, policy=policy, log=log), path, pid
+    return Cyclone2(path, policy=policy, log=log, dongle=CONFIG_PIDS[pid] == "dongle"), path, pid
 
 
 def make_log(path):
@@ -384,6 +364,9 @@ def main(argv=None):
     ru.add_argument("--strong", type=percent, default=100, help="left/large motor, %%")
     ru.add_argument("--weak", type=percent, default=100, help="right/small motor, %%")
     ru.add_argument("--ms", type=int, default=1000, help="duration (default 1000)")
+    gu = sub.add_parser("gui", help="open the graphical interface in your browser")
+    gu.add_argument("--no-browser", action="store_true",
+                    help="only print the address; open it yourself")
     r = sub.add_parser("restore", help="write back a backup (only differing bytes)")
     r.add_argument("file")
     r.add_argument("--plan", action="store_true",
@@ -406,6 +389,9 @@ def main(argv=None):
             ap.error("--dry-run needs --effect (the active one is read from the device)")
         if args.setting not in LIGHT_SETTINGS and args.profile is None:
             ap.error("--dry-run needs --profile (the active one is read from the device)")
+    if args.cmd == "gui":
+        from .gui import main as gui_main
+        return gui_main(no_browser=args.no_browser)
     if args.cmd == "rumble":
         if args.dry_run:
             print("dry run: rumble sends no vendor-channel packets; it plays a kernel "
