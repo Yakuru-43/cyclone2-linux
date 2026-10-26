@@ -84,6 +84,39 @@ def check_write(pkt, fields):
     return f"bank 0x{bank:02x} +0x{off:03x} [{n}] is not an approved field"
 
 
+def check_restore(pkt):
+    """Policy for `cyclone2 restore`: writes anywhere inside a known bank."""
+    if len(pkt) != REPORT_LEN or pkt[:2] != bytes([REPORT_OUT, OP_WRITE]):
+        return "not a 64-byte write command"
+    bank, off, n = pkt[2], pkt[3] << 8 | pkt[4], pkt[5]
+    if bank not in (1, 2, 3, 4, 5, 0x20) or not _in_bank(bank, off, n):
+        return f"bank 0x{bank:02x} +0x{off:03x} [{n}] is outside the configuration banks"
+    if any(pkt[6 + n:]):
+        return "non-zero padding after the data"
+    return None
+
+
+def diff_writes(bank, current, target, gap=4):
+    """Write chunks that turn `current` into `target`, touching only differing
+    bytes (runs closer than `gap` bytes are merged, chunks are <= 58 bytes)."""
+    runs, i = [], 0
+    while i < len(target):
+        if current[i] == target[i]:
+            i += 1
+            continue
+        j = i
+        while j < len(target) and (current[j] != target[j] or any(
+                current[k] != target[k] for k in range(j, min(j + gap, len(target))))):
+            j += 1
+        runs.append((i, j))
+        i = j
+    chunks = []
+    for start, end in runs:
+        for off in range(start, end, CHUNK):
+            chunks.append((bank, off, bytes(target[off:min(end, off + CHUNK)])))
+    return chunks
+
+
 def _in_bank(bank, offset, length):
     return (bank in BANK_SIZE and 1 <= length <= CHUNK
             and offset + length <= BANK_SIZE[bank])

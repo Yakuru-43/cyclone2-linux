@@ -33,3 +33,24 @@ class Writes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Restore(unittest.TestCase):
+    def test_diff_writes_minimal(self):
+        cur = bytearray(680)
+        tgt = bytearray(680)
+        tgt[0x2E] = 2
+        tgt[0x100:0x150] = b"\x01" * 0x50   # 80 bytes -> two chunks
+        chunks = P.diff_writes(1, cur, tgt)
+        self.assertEqual(chunks[0], (1, 0x2E, b"\x02"))
+        self.assertEqual([(o, len(d)) for _, o, d in chunks[1:]], [(0x100, 58), (0x13A, 22)])
+        for bank, off, data in chunks:
+            self.assertIsNone(P.check_restore(P.write_chunk(bank, off, data)))
+
+    def test_diff_writes_none_when_equal(self):
+        self.assertEqual(P.diff_writes(1, bytes(680), bytes(680)), [])
+
+    def test_restore_policy_bounds(self):
+        self.assertIsNotNone(P.check_restore(P.write_chunk(1, 0x2A0, b"\0" * 9)))
+        self.assertIsNotNone(P.check_restore(P.write_chunk(0x30, 0, b"\1")))
+        self.assertIsNotNone(P.check_restore(P.packet(0x17, 0x55, 0x88)))

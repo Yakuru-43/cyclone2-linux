@@ -142,6 +142,35 @@ def cmd_set(dev, path, pid, args):
           f"(written and read back){'' if effect == active else ' (not the active effect)'}")
 
 
+def load_backup(path):
+    doc = json.load(open(path))
+    banks = doc["banks"] if "banks" in doc else doc  # older backups: {bank: hex}
+    return {int(k, 16): bytes.fromhex(v) for k, v in banks.items()}
+
+
+def cmd_restore(dev, path, pid, args):
+    target = load_backup(args.file)
+    plan = []
+    for bank in sorted(target):
+        if len(target[bank]) != P.BANK_SIZE.get(bank):
+            raise DeviceError(f"backup bank 0x{bank:02x} has the wrong size")
+        plan += P.diff_writes(bank, dev.read_bank(bank), target[bank])
+    if not plan:
+        print("the controller already matches the backup")
+        return
+    print(f"{len(plan)} write(s), {sum(len(d) for _, _, d in plan)} bytes:")
+    for bank, off, data in plan:
+        print(f"  {P.write_chunk(bank, off, data)[:6 + len(data)].hex(' ')} + zeros")
+    if args.plan:
+        print("(plan only: nothing written)")
+        return
+    dev.policy = lambda pkt: (P.check_restore(pkt) if pkt[1] == P.OP_WRITE
+                              else P.check_read_only(pkt))
+    for bank, off, data in plan:
+        dev.write(bank, off, data)
+    print("restored and read back")
+
+
 def percent(text):
     v = int(text)
     if not 0 <= v <= 100:
@@ -169,8 +198,14 @@ def main(argv=None):
     st.add_argument("value", type=percent)
     st.add_argument("--effect", type=lambda t: int(t) - 1, metavar="1-5",
                     help="lighting effect (default: the active one)")
+    r = sub.add_parser("restore", help="write back a backup (only differing bytes)")
+    r.add_argument("file")
+    r.add_argument("--plan", action="store_true",
+                   help="read the controller and print the writes, write nothing")
     args = ap.parse_args(argv)
 
+    if args.dry_run and args.cmd == "restore":
+        ap.error("restore needs the controller's current state: use --plan instead")
     if args.dry_run and args.cmd == "set" and args.effect is None:
         ap.error("--dry-run for set needs --effect (the active one is read from the device)")
     if args.dry_run:
@@ -180,7 +215,7 @@ def main(argv=None):
         dev, path, pid = open_device(args, make_log(args.log))
         with dev:
             {"info": cmd_info, "get": cmd_get, "backup": cmd_backup,
-             "set": cmd_set}[args.cmd](
+             "set": cmd_set, "restore": cmd_restore}[args.cmd](
                 dev, path, pid, args)
     except DeviceError as e:
         print(f"error: {e}", file=sys.stderr)
