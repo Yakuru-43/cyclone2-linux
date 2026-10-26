@@ -61,6 +61,29 @@ def read_bank(bank):
             for off in range(0, size, CHUNK)]
 
 
+def write_chunk(bank, offset, data):
+    if not 1 <= len(data) <= CHUNK:
+        raise ValueError("a write carries 1-58 data bytes")
+    return packet(OP_WRITE, bank, offset >> 8, offset & 0xFF, len(data), *data)
+
+
+def check_write(pkt, fields):
+    """Allow a WriteProfile only if it lies inside one approved field and every
+    value is in that field's range. `fields`: iterable of layout.Field."""
+    if len(pkt) != REPORT_LEN or pkt[:2] != bytes([REPORT_OUT, OP_WRITE]):
+        return "not a 64-byte write command"
+    bank, off, n = pkt[2], pkt[3] << 8 | pkt[4], pkt[5]
+    data = pkt[6:6 + n]
+    if any(pkt[6 + n:]):
+        return "non-zero padding after the data"
+    for f in fields:
+        if f.bank == bank and f.offset <= off and off + n <= f.offset + f.length:
+            if all(f.lo <= v <= f.hi for v in data):
+                return None
+            return f"value out of range for {f.name} ({f.lo}-{f.hi})"
+    return f"bank 0x{bank:02x} +0x{off:03x} [{n}] is not an approved field"
+
+
 def _in_bank(bank, offset, length):
     return (bank in BANK_SIZE and 1 <= length <= CHUNK
             and offset + length <= BANK_SIZE[bank])

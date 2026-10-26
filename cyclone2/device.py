@@ -81,6 +81,22 @@ class Cyclone2:
     def current_profile(self):
         return self.transact(P.current_profile(), {P.OP_CURRENT_PROFILE_ACK})[2]
 
+    def read(self, bank, offset, length):
+        reply = self.transact(P.read_chunk(bank, offset, length), {P.OP_READ_ACK})
+        rbank, off, data = P.parse_read_reply(reply)
+        if (rbank, off, len(data)) != (bank, offset, length):
+            raise DeviceError(f"reply {reply[:6].hex(' ')} does not match the request")
+        return data
+
+    def write(self, bank, offset, data):
+        """Write, then read the same bytes back and compare."""
+        self.transact(P.write_chunk(bank, offset, data), {P.OP_ACK})
+        back = self.read(bank, offset, len(data))
+        if back != bytes(data):
+            raise DeviceError(f"read-back mismatch at bank 0x{bank:02x} +0x{offset:03x}: "
+                              f"wrote {bytes(data).hex(' ')}, read {back.hex(' ')}")
+        return back
+
     def read_bank(self, bank):
         buf = bytearray(P.BANK_SIZE[bank])
         for pkt in P.read_bank(bank):

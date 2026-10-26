@@ -1,5 +1,7 @@
 """Decode the Cyclone 2's configuration banks (PROTOCOL.md §4)."""
 
+from collections import namedtuple
+
 PROFILE_BANKS = (1, 2, 3, 4, 5)  # 5 is the "Shift" layer
 LIGHT_BANK = 0x20
 BANK_SIZE = {**{b: 680 for b in PROFILE_BANKS}, LIGHT_BANK: 635}
@@ -8,6 +10,9 @@ KEYS = ("Up", "Down", "Left", "Right", "LB", "RB", "LS", "RS",
         "A", "B", "X", "Y", "Home", "View", "Menu", "Share")
 REPORT_RATES = {0: "250 Hz", 1: "500 Hz", 2: "1000 Hz"}
 MOTOR_LEVELS = {0: 0, 25: 1, 50: 2, 75: 3, 100: 4}
+
+# A writable field: name, bank, offset, length and the allowed value range.
+Field = namedtuple("Field", "name bank offset length lo hi")
 
 LT, RT = 0x1EE, 0x20A
 LEFT_STICK, RIGHT_STICK = 0x226, 0x246
@@ -77,3 +82,11 @@ def decode_light(b):
         "profile_led": f"#{b[0x26F]:02x}{b[0x270]:02x}{b[0x271]:02x}",
         "standby_time": b[0x273],
     }
+
+
+def light_brightness(effect):
+    """Brightness of one lighting effect (animation 0-4), 0-100."""
+    if not 0 <= effect <= 4:
+        raise ValueError("effect must be 0-4")
+    return Field(f"light.effect{effect}.brightness", LIGHT_BANK,
+                 1 + 124 * effect + 3, 1, 0, 100)
