@@ -1,0 +1,12 @@
+# GameSir binaries, extracted installer contents, firmware: never commit
+vendor/
+
+# Unfiltered captures (may contain unrelated USB traffic); commit filtered ones
+captures/raw/
+
+# Personal identifiers (serial numbers, Bluetooth addresses)
+private/
+
+.venv/
+__pycache__/
+*.pyc

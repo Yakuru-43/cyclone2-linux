@@ -1,0 +1,49 @@
+# Recon: as-found
+
+sysfs: /sys/devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10
+
+## Device
+  idVendor             3537
+  idProduct            0575
+  bcdDevice            0120
+  version              2.00
+  speed                12
+  manufacturer         Guangzhou Chicken Run Network Technology Co., Ltd.
+  product              GameSir-Cyclone 2
+  bDeviceClass         00
+  bDeviceSubClass      00
+  bDeviceProtocol      00
+  bMaxPacketSize0      64
+  bNumConfigurations   1
+  bConfigurationValue  1
+  bNumInterfaces       1
+  bmAttributes         80
+  bMaxPower            500mA
+  busnum               1
+  devnum               3
+  devpath              10
+
+## Interface 1-10:1.0
+  bInterfaceNumber     00
+  bAlternateSetting    0
+  bInterfaceClass      03
+  bInterfaceSubClass   00
+  bInterfaceProtocol   00
+  bNumEndpoints        02
+  modalias             usb:v3537p0575d0120dc00dsc00dp00ic03isc00ip00in00
+  driver               usbhid
+  ep_02: bEndpointAddress=02 bmAttributes=03 wMaxPacketSize=0040 bInterval=01 type=Interrupt direction=out interval=1ms
+  ep_82: bEndpointAddress=82 bmAttributes=03 wMaxPacketSize=0040 bInterval=01 type=Interrupt direction=in interval=1ms
+  usbmisc: hiddev0
+
+### HID 0003:3537:0575.0001 (if00)
+  DRIVER=hid-generic
+  HID_ID=0003:00003537:00000575
+  HID_NAME=Guangzhou Chicken Run Network Technology Co., Ltd. GameSir-Cyclone 2
+  HID_PHYS=usb-0000:03:00.0-10/input0
+  HID_UNIQ=
+  MODALIAS=hid:b0003g0001v00003537p00000575
+  hidraw: hidraw0
+  input2: name='Guangzhou Chicken Run Network Technology Co., Ltd. GameSir-Cyclone 2 Consumer Control' handlers=event2
+  input3: name='Guangzhou Chicken Run Network Technology Co., Ltd. GameSir-Cyclone 2' handlers=event3
+  report descriptor: 114 bytes -> rdesc-if00.bin / rdesc-if00.txt

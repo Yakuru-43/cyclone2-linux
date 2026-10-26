@@ -1,0 +1,60 @@
+# device 0:0
+# 0x05, 0x0c,                    // Usage Page (Consumer Devices)       0
+# 0x09, 0x01,                    // Usage (Consumer Control)            2
+# 0xa1, 0x01,                    // Collection (Application)            4
+# 0x85, 0xdd,                    //  Report ID (221)                    6
+# 0x15, 0x00,                    //  Logical Minimum (0)                8
+# 0x25, 0x01,                    //  Logical Maximum (1)                10
+# 0x09, 0xe9,                    //  Usage (Volume Up)                  12
+# 0x09, 0xea,                    //  Usage (Volume Down)                14
+# 0x75, 0x01,                    //  Report Size (1)                    16
+# 0x95, 0x02,                    //  Report Count (2)                   18
+# 0x81, 0x02,                    //  Input (Data,Var,Abs)               20
+# 0x75, 0x01,                    //  Report Size (1)                    22
+# 0x95, 0x06,                    //  Report Count (6)                   24
+# 0x81, 0x01,                    //  Input (Cnst,Arr,Abs)               26
+# 0xc0,                          // End Collection                      28
+# 0x06, 0x32, 0xff,              // Usage Page (Vendor Usage Page 0xff32) 29
+# 0x09, 0x74,                    // Usage (Vendor Usage 0x74)           32
+# 0xa1, 0x01,                    // Collection (Application)            34
+# 0x85, 0x41,                    //  Report ID (65)                     36
+# 0x09, 0x75,                    //  Usage (Vendor Usage 0x75)          38
+# 0x15, 0x00,                    //  Logical Minimum (0)                40
+# 0x26, 0xff, 0x00,              //  Logical Maximum (255)              42
+# 0x95, 0x3f,                    //  Report Count (63)                  45
+# 0x75, 0x08,                    //  Report Size (8)                    47
+# 0x81, 0x02,                    //  Input (Data,Var,Abs)               49
+# 0x85, 0x41,                    //  Report ID (65)                     51
+# 0x09, 0x76,                    //  Usage (Vendor Usage 0x76)          53
+# 0x15, 0x00,                    //  Logical Minimum (0)                55
+# 0x26, 0xff, 0x00,              //  Logical Maximum (255)              57
+# 0x95, 0x3f,                    //  Report Count (63)                  60
+# 0x75, 0x08,                    //  Report Size (8)                    62
+# 0x91, 0x02,                    //  Output (Data,Var,Abs)              64
+# 0xc0,                          // End Collection                      66
+# 0x06, 0xf0, 0xff,              // Usage Page (Vendor Usage Page 0xfff0) 67
+# 0x09, 0x40,                    // Usage (Vendor Usage 0x40)           70
+# 0xa1, 0x01,                    // Collection (Application)            72
+# 0x06, 0x00, 0xff,              //  Usage Page (Vendor Defined Page 1) 74
+# 0x09, 0x00,                    //  Usage (Undefined)                  77
+# 0x85, 0x10,                    //  Report ID (16)                     79
+# 0x15, 0x00,                    //  Logical Minimum (0)                81
+# 0x26, 0xff, 0x00,              //  Logical Maximum (255)              83
+# 0x35, 0x00,                    //  Physical Minimum (0)               86
+# 0x46, 0xff, 0x00,              //  Physical Maximum (255)             88
+# 0x75, 0x08,                    //  Report Size (8)                    91
+# 0x95, 0x3f,                    //  Report Count (63)                  93
+# 0x81, 0x02,                    //  Input (Data,Var,Abs)               95
+# 0x85, 0x12,                    //  Report ID (18)                     97
+# 0x09, 0x21,                    //  Usage (Vendor Usage 0x21)          99
+# 0x95, 0x3f,                    //  Report Count (63)                  101
+# 0x81, 0x02,                    //  Input (Data,Var,Abs)               103
+# 0x85, 0x0f,                    //  Report ID (15)                     105
+# 0x09, 0x22,                    //  Usage (Vendor Usage 0x22)          107
+# 0x95, 0x3f,                    //  Report Count (63)                  109
+# 0x91, 0x02,                    //  Output (Data,Var,Abs)              111
+# 0xc0,                          // End Collection                      113
+# 
+R: 114 05 0c 09 01 a1 01 85 dd 15 00 25 01 09 e9 09 ea 75 01 95 02 81 02 75 01 95 06 81 01 c0 06 32 ff 09 74 a1 01 85 41 09 75 15 00 26 ff 00 95 3f 75 08 81 02 85 41 09 76 15 00 26 ff 00 95 3f 75 08 91 02 c0 06 f0 ff 09 40 a1 01 06 00 ff 09 00 85 10 15 00 26 ff 00 35 00 46 ff 00 75 08 95 3f 81 02 85 12 09 21 95 3f 81 02 85 0f 09 22 95 3f 91 02 c0
+N: device 0:0
+I: 3 0001 0001
