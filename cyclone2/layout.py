@@ -90,3 +90,16 @@ def light_brightness(effect):
         raise ValueError("effect must be 0-4")
     return Field(f"light.effect{effect}.brightness", LIGHT_BANK,
                  1 + 124 * effect + 3, 1, 0, 100)
+
+
+# Data zones in each lighting frame (PROTOCOL.md §4.9). "home" is InFract's
+# label only (unconfirmed); zone 2 shows nothing on the owner's controller.
+LIGHT_ZONES = {"left": 0, "right": 1, "zone2": 2, "home": 3, "m": 4}
+
+
+def light_color(effect, frame, zone):
+    """One zone's colour (R, G, B) in one frame of one lighting effect."""
+    if not (0 <= effect <= 4 and 0 <= frame <= 7 and 0 <= zone <= 4):
+        raise ValueError("effect 0-4, frame 0-7, zone 0-4")
+    return Field(f"light.effect{effect}.frame{frame}.zone{zone}", LIGHT_BANK,
+                 1 + 124 * effect + 4 + 15 * frame + 3 * zone, 3, 0, 255)

@@ -12,13 +12,14 @@ import time
 
 from . import protocol as P
 from .device import CONFIG_PIDS, Cyclone2, DeviceError, find
-from .layout import (LIGHT_BANK, PROFILE_BANKS, decode_light, decode_profile,
-                     light_brightness)
+from .layout import (LIGHT_BANK, LIGHT_ZONES, PROFILE_BANKS, decode_light,
+                     decode_profile, light_brightness, light_color)
 
 ALL_BANKS = (*PROFILE_BANKS, LIGHT_BANK)
 
 # Field kinds the owner has approved for writing, one kind at a time (step 6).
-APPROVED_WRITES = [light_brightness(e) for e in range(5)]
+APPROVED_WRITES = [light_brightness(e) for e in range(5)] + [
+    light_color(e, f, z) for e in range(5) for f in range(8) for z in range(5)]
 
 
 def policy(pkt):
@@ -46,11 +47,11 @@ def parse_bank(text):
 
 def planned_packets(args):
     if args.cmd == "set":
-        f = light_brightness(args.effect)
+        f, value = set_target(args, args.effect)
         return [P.read_chunk(LIGHT_BANK, 0, 1),          # active effect
-                P.read_chunk(f.bank, f.offset, 1),        # old value, for the message
-                P.write_chunk(f.bank, f.offset, [args.value]),
-                P.read_chunk(f.bank, f.offset, 1)]        # read-back
+                P.read_chunk(f.bank, f.offset, f.length),  # old value, for the message
+                P.write_chunk(f.bank, f.offset, value),
+                P.read_chunk(f.bank, f.offset, f.length)]  # read-back
     if args.cmd == "info":
         return [P.fw_version(), P.current_profile()]
     banks = args.bank if args.cmd == "get" else list(ALL_BANKS)
@@ -133,14 +134,37 @@ def cmd_backup(dev, path, pid, args):
     print(f"saved {len(banks)} banks to {args.file}")
 
 
+def set_target(args, effect):
+    """(Field, bytes) for a `set` command on the given effect."""
+    if args.setting == "brightness":
+        return light_brightness(effect), bytes([args.value])
+    zone, rgb = args.value
+    return light_color(effect, args.frame, zone), rgb
+
+
+def show(field, data):
+    return "#" + data.hex() if field.length == 3 else str(data[0])
+
+
 def cmd_set(dev, path, pid, args):
     active = dev.read(LIGHT_BANK, 0, 1)[0]
     effect = active if args.effect is None else args.effect
-    f = light_brightness(effect)
-    old = dev.read(f.bank, f.offset, 1)[0]
-    dev.write(f.bank, f.offset, [args.value])
-    print(f"lighting effect {effect + 1} brightness: {old} -> {args.value} "
-          f"(written and read back){'' if effect == active else ' (not the active effect)'}")
+    f, value = set_target(args, effect)
+    old = dev.read(f.bank, f.offset, f.length)
+    dev.write(f.bank, f.offset, value)
+    print(f"{f.name}: {show(f, old)} -> {show(f, value)} (written and read back)"
+          f"{'' if effect == active else ' (not the active effect)'}")
+
+
+def zone_color(text):
+    """'right=#ff0500' -> (zone index, b'\xff\x05\x00')."""
+    name, _, color = text.partition("=")
+    if name not in LIGHT_ZONES:
+        raise argparse.ArgumentTypeError(f"zone must be one of {', '.join(LIGHT_ZONES)}")
+    color = color.lstrip("#")
+    if len(color) != 6:
+        raise argparse.ArgumentTypeError("colour must be #RRGGBB")
+    return LIGHT_ZONES[name], bytes.fromhex(color)
 
 
 def load_backup(path):
@@ -195,8 +219,11 @@ def main(argv=None):
     b = sub.add_parser("backup", help="save every bank to a new JSON file")
     b.add_argument("file")
     st = sub.add_parser("set", help="change one setting (writes to the controller)")
-    st.add_argument("setting", choices=["brightness"])
-    st.add_argument("value", type=percent)
+    st.add_argument("setting", choices=["brightness", "color"])
+    st.add_argument("value", help="brightness: 0-100; color: ZONE=#RRGGBB with ZONE in "
+                    + ", ".join(LIGHT_ZONES))
+    st.add_argument("--frame", type=lambda t: int(t) - 1, default=0, metavar="1-8",
+                    help="animation frame for color (default: 1)")
     st.add_argument("--effect", type=lambda t: int(t) - 1, metavar="1-5",
                     help="lighting effect (default: the active one)")
     r = sub.add_parser("restore", help="write back a backup (only differing bytes)")
@@ -204,6 +231,12 @@ def main(argv=None):
     r.add_argument("--plan", action="store_true",
                    help="read the controller and print the writes, write nothing")
     args = ap.parse_args(argv)
+    if args.cmd == "set":
+        try:
+            args.value = (percent(args.value) if args.setting == "brightness"
+                          else zone_color(args.value))
+        except (argparse.ArgumentTypeError, ValueError) as e:
+            ap.error(f"set {args.setting}: {e}")
 
     if args.dry_run and args.cmd == "restore":
         ap.error("restore needs the controller's current state: use --plan instead")

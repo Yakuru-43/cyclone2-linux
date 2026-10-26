@@ -27,8 +27,18 @@ class Writes(unittest.TestCase):
         self.assertIsNone(policy(P.fw_version()))
 
     def test_approved_list(self):
-        self.assertEqual([f.offset for f in APPROVED_WRITES],
+        self.assertEqual([f.offset for f in APPROVED_WRITES[:5]],
                          [0x004, 0x080, 0x0FC, 0x178, 0x1F4])
+
+    def test_color_write_matches_gsc(self):
+        # capture 02: GSC zone 3 (right grip) = effect 4 frame 1 data zone 1
+        from cyclone2.layout import light_color
+        f = light_color(3, 0, 1)
+        self.assertEqual(f.offset, 0x17C)
+        pkt = P.write_chunk(f.bank, f.offset, bytes.fromhex("00ff11"))
+        self.assertEqual(pkt[:9].hex(" "), "0f 03 20 01 7c 03 00 ff 11")
+        self.assertIsNone(policy(pkt))
+        self.assertIsNotNone(policy(P.write_chunk(0x20, 0x17D, b"\0\0\0")))  # misaligned
 
 
 if __name__ == "__main__":
@@ -66,5 +76,5 @@ class DryRunMatchesDevice(unittest.TestCase):
         log = Path(__file__).resolve().parent.parent / "captures/12-cli-set-brightness.jsonl"
         sent = [bytes.fromhex(json.loads(l)["hex"]) for l in open(log)
                 if json.loads(l)["dir"] == "out"][:4]
-        planned = planned_packets(Namespace(cmd="set", effect=3, value=50))
+        planned = planned_packets(Namespace(cmd="set", setting="brightness", effect=3, value=50))
         self.assertEqual(planned, sent)
