@@ -269,7 +269,7 @@ The serializers (`$a.fromModel`, `qo.fromModel`) compute no sum or CRC.
 |---|---|---|
 | 1–4 | 680 | profiles 1–4 |
 | 5 | 680 | "Shift" layer |
-| 0x20 | 635 | Light (RGB), shared by all profiles |
+| 0x20 | 635 | Light (RGB), **shared by all profiles**. Confirmed 2026-10-26 (`captures/25-test-profiles.jsonl`): with brightness 100, the LEDs stayed lit after switching profile 2 → 1, while an A→B mapping written to bank 2 only applied on profile 2. |
 | 0x30 | ? | current profile number at offset 0 (InFract; GSC uses 0x30 as "CurrentOfProfileNumber") |
 
 ### 4.2 Profile bank layout (680 bytes), from `$a.fromBytes`/`fromModel`
@@ -467,7 +467,7 @@ order in report 0x12 (Home, LowerLeft, …) is a different list.
 | Stick deadzones | bank *n*, 0x229–0x22C (L) / 0x249–0x24C (R) | high (GSC only) |
 | Trigger deadzones | 0x1F0–0x1F4 (LT) / 0x20C–0x210 (RT); hair trigger at +12–14 | high (GSC only) |
 | Button remapping | key blocks 0x040–0x0AF, back buttons 0x0B0/0x14F; needs the `Xa` code table | medium |
-| Profiles | read: `0B` / bank 0x30; switch: `07 n` | high |
+| Profiles | read: `0B` / bank 0x30; switch: `07 n` | **confirmed** (CLI `profile N`; per-profile settings verified by feel; the controller shows no LED indication on a switch) |
 
 ## 5. Firmware-update paths (must never be triggered)
 
