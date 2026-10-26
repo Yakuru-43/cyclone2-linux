@@ -171,3 +171,13 @@ class Remap(Deadzone):
     def test_keyboard_targets_refused_for_now(self):
         self.assertIsNotNone(policy(P.write_chunk(1, 0x07A, [1, 0x32])))   # KB_ESC
         self.assertIsNotNone(policy(P.write_chunk(1, 0x079, [1, 0x0A, 0])))  # spills into turbo
+
+
+class SwitchProfile(unittest.TestCase):
+    def test_policy(self):
+        self.assertIsNone(policy(P.switch_profile(2)))
+        for pkt in (P.switch_profile(5), P.switch_profile(0), P.packet(0x07, 2, 1)):
+            self.assertIsNotNone(policy(pkt), pkt[:4].hex(" "))
+
+    def test_matches_capture_04(self):
+        self.assertEqual(P.switch_profile(2)[:3].hex(" "), "0f 07 02")

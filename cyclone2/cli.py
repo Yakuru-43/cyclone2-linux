@@ -34,6 +34,8 @@ MAP_TARGETS = {name: code for name, code in KEY_CODES.items() if 0x01 <= code <=
 def policy(pkt):
     if pkt[1:2] == bytes([P.OP_WRITE]):
         return P.check_write(pkt, APPROVED_WRITES)
+    if pkt[1:2] == bytes([P.OP_SWITCH_PROFILE]):
+        return P.check_switch_profile(pkt)
     return P.check_read_only(pkt)
 
 
@@ -67,6 +69,8 @@ def planned_packets(args):
                 P.read_chunk(f.bank, pre_off, pre_len),  # current value (and enable byte)
                 P.write_chunk(f.bank, f.offset, data),
                 P.read_chunk(f.bank, f.offset, len(data))]
+    if args.cmd == "profile":
+        return [P.current_profile(), P.switch_profile(args.number), P.current_profile()]
     if args.cmd == "info":
         return [P.fw_version(), P.current_profile()]
     banks = args.bank if args.cmd == "get" else list(ALL_BANKS)
@@ -204,6 +208,15 @@ def cmd_set_profile_setting(dev, args):
           f"{'' if bank == current else ' (not the active profile)'}")
 
 
+def cmd_profile(dev, path, pid, args):
+    old = dev.current_profile()
+    dev.transact(P.switch_profile(args.number), {P.OP_ACK})
+    now = dev.current_profile()
+    if now != args.number:
+        raise DeviceError(f"asked for profile {args.number}, controller reports {now}")
+    print(f"active profile: {old} -> {now}")
+
+
 def cmd_set(dev, path, pid, args):
     if args.setting not in LIGHT_SETTINGS:
         return cmd_set_profile_setting(dev, args)
@@ -332,6 +345,8 @@ def main(argv=None):
                     help="animation frame for color (default: 1)")
     st.add_argument("--effect", type=lambda t: int(t) - 1, metavar="1-5",
                     help="lighting effect (default: the active one)")
+    pr = sub.add_parser("profile", help="switch the active profile (1-4)")
+    pr.add_argument("number", type=int, choices=[1, 2, 3, 4])
     r = sub.add_parser("restore", help="write back a backup (only differing bytes)")
     r.add_argument("file")
     r.add_argument("--plan", action="store_true",
@@ -360,7 +375,7 @@ def main(argv=None):
         dev, path, pid = open_device(args, make_log(args.log))
         with dev:
             {"info": cmd_info, "get": cmd_get, "backup": cmd_backup,
-             "set": cmd_set, "restore": cmd_restore}[args.cmd](
+             "set": cmd_set, "profile": cmd_profile, "restore": cmd_restore}[args.cmd](
                 dev, path, pid, args)
     except DeviceError as e:
         print(f"error: {e}", file=sys.stderr)

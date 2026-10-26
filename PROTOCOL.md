@@ -318,6 +318,10 @@ Turbo: `turbo_en = speed > 0`.
 wrote `0F 03 01 00 7A 02 01 0A` (A's block + 2: map_en = 1, map1 = 0x0A).
 Mapping A back to itself wrote `… 02 00 00`. "Self" means map_en = 0.
 
+**Written by our CLI and checked by feel** (`captures/21-…`, `22-…`):
+`set map A=B` (`0F 03 01 00 7A 02 01 0A`) made A register as B in Steam,
+while B stayed B. `set map A=A` (`…02 00 00`) restored it.
+
 ### 4.5 Back-button block (159 bytes)
 The 7-byte key block, then macro data:
 - flags byte: bit 0 enabled, bit 1 press-to-trigger, bit 2 cycle;

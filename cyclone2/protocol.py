@@ -88,6 +88,18 @@ def check_write(pkt, fields):
     return f"bank 0x{bank:02x} +0x{off:03x} [{n}] is not an approved field"
 
 
+def switch_profile(n):
+    return packet(OP_SWITCH_PROFILE, n)
+
+
+def check_switch_profile(pkt):
+    """SwitchProfile to profile 1-4 (not the Shift layer), nothing else."""
+    if len(pkt) == REPORT_LEN and pkt[:2] == bytes([REPORT_OUT, OP_SWITCH_PROFILE]) \
+            and 1 <= pkt[2] <= 4 and not any(pkt[3:]):
+        return None
+    return "not a SwitchProfile to profile 1-4"
+
+
 def check_restore(pkt):
     """Policy for `cyclone2 restore`: writes anywhere inside a known bank."""
     if len(pkt) != REPORT_LEN or pkt[:2] != bytes([REPORT_OUT, OP_WRITE]):
