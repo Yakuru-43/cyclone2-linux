@@ -52,7 +52,14 @@ not negotiable.
 ## Environment (owner's machine)
 - Bazzite (Fedora Atomic). Never layer packages with rpm-ostree; use a
   distrobox or the home directory, and tell the owner what was installed.
-- `.venv/` in this repo: hid-tools (for `hid-decode`).
+- `.venv/` in this repo: hid-tools (for `hid-decode`) and hidapi (cython-hidapi;
+  the CLI uses its `hidraw` backend, never the libusb one). Run the CLI with
+  `.venv/bin/python -m cyclone2 …`. Commit only if
+  `python3 -m unittest discover -s tests` passes.
+- Allow-lists live in `cyclone2/protocol.py` (check_read_only, check_write,
+  check_switch_profile, check_restore, check_gsc) and `cyclone2/cli.py`
+  (APPROVED_WRITES). Add a new writable field kind only after the owner
+  approves it, and show its dry run first.
 - distrobox `cyclone2` (fedora-toolbox:44): wine 11.0 (staging), wireshark-cli
   4.6.9. Wine prefix: `~/.local/share/wineprefixes/gamesir-connect`.
   Run GameSir Connect only through `tools/gamesir-wine.sh`. By default it has
