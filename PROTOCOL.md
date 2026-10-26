@@ -283,12 +283,12 @@ TRI = Y, PS = Home, Sel = View, Sta = Menu, Camera = Share, FL1/FR1 = L4/R4.
 ### 4.3 Fun_Data (0x020–0x03F)
 | Offset | Field | Values |
 |---|---|---|
-| 0x020 / 0x021 / 0x022 / 0x023 | motor left / right / LT / RT | raw 0, 25, 50, 75, 100 = UI levels 0–4 (`D()`/`L()`, l. 8605). Default UI level 3 (raw 75). |
+| 0x020 / 0x021 / 0x022 / 0x023 | motor left / right / LT / RT (GSC v1.14.5 has **no UI** for these on the Cyclone 2; to confirm with our own write in step 6) | raw 0, 25, 50, 75, 100 = UI levels 0–4 (`D()`/`L()`, l. 8605). Default UI level 3 (raw 75). |
 | 0x024–0x028 | audio: enable, volume, mixer, mic mute, mic sensitivity | |
 | 0x029 / 0x02A | shift enable / shift value | |
 | 0x02B | D-pad diagonal lock | bit 0 |
 | 0x02C / 0x02D | XInput / Switch ABXY swap | bit 0 |
-| 0x02E | report rate | 0 = 250 Hz, 1 = 500, 2 = 1000 (meaning from InFract; GSC passes the raw value) |
+| 0x02E | report rate | 0 = 250 Hz, 1 = 500, 2 = 1000. **Confirmed:** the factory value 2 showed as 1000 Hz in GSC, and clicking 250 Hz → 1000 Hz wrote `00`, then `02` (GSC debug log, 2026-10-26 20:51; the proxy capture of this was deleted by mistake) |
 | 0x02F–0x03F | reserved | |
 
 ### 4.4 Key block (7 bytes)
@@ -413,6 +413,19 @@ Zone order (data zone *z* in each frame):
 
 This matches InFract's labels (left, right, ?, Home, dots). GSC's live-state
 order in report 0x12 (Home, LowerLeft, …) is a different list.
+
+### 4.9b What GSC's main page shows (owner's screenshot, 2026-10-26)
+- Lights: effects I–IV. "IV" is highlighted, which matches light byte 0 = 3.
+  Presets (Flow, Rainbow, Pulse, Standoff, Alarm, Off), plus brightness and
+  speed sliders.
+- Report rate 250 / 500 / 1000 Hz; Motion; Triggers (deadzone, hair trigger
+  mode Off / Adaptive / Fixed); Sticks (deadzone, anti-deadzone, curve);
+  Buttons. Factory L4 shows `</>`, a macro: L4's block has flags = 1 and two
+  steps (RB, then Home).
+- The controller itself navigates GSC's UI (D-pad, A, B, X = Shift layer).
+  The unrequested profile switch in capture 04 was most likely the controller
+  being nudged. When a profile is opened, GSC re-encodes it.
+- A top-right icon with a red dot is the firmware-update badge.
 
 ### 4.10 Target settings → where they live
 | Setting | Location | Confidence |
