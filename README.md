@@ -9,6 +9,10 @@ these settings.
 it refuses the commands that start an update, as well as calibration
 (see [Safety](#safety)).
 
+It comes with a **graphical interface** and a command-line tool, both in
+**one small self-contained file** (about 30 KB). There are no dependencies:
+it needs only the Python 3 that every Linux desktop already ships.
+
 Not affiliated with or endorsed by GameSir. Contains no GameSir code,
 binaries or firmware.
 
@@ -34,14 +38,18 @@ read, brightness write). Commands are paced, because the radio occasionally
 drops one. Reads are retried, and writes are verified and resent once if
 they did not land. Bluetooth is not supported.
 
-## Install (Bazzite / Fedora Atomic)
+## Install
 
-No system packages and no `rpm-ostree` needed:
+One command, no root, nothing else to install (works on Bazzite and other
+immutable systems too):
 
 ```sh
-git clone https://github.com/Yakuru-43/cyclone2-linux.git && cd cyclone2-linux
-pip install --user .          # installs `cyclone2` into ~/.local/bin, plus hidapi
+git clone https://github.com/Yakuru-43/cyclone2-linux.git && cd cyclone2-linux && ./install.sh
 ```
+
+This builds the single file `cyclone2` (standard library only), copies it to
+`~/.local/bin`, and adds **Cyclone 2** to your application menu.
+`./install.sh --uninstall` removes both. Requires Python 3.9 or newer.
 
 The controller must be in **XInput mode** (the Home LED shows green when you
 hold M). Mode switching: hold View + Menu to cycle XInput → Switch → DS4.
@@ -56,6 +64,25 @@ sudo udevadm control --reload && sudo udevadm trigger
 ```
 
 ## Usage
+
+### Graphical interface
+
+Open **Cyclone 2** from the application menu, or run `cyclone2 gui`. It
+opens in a browser you already have: a Chromium-based browser opens it as an
+app window, otherwise it opens as a tab. Nothing is downloaded and nothing
+leaves your computer.
+
+- Pick the profile to edit, adjust lighting, deadzones, hair trigger,
+  vibration and button mapping, then **Review & apply**.
+- The review lists the exact packets that will be sent. Nothing is written
+  until you confirm, and every write is read back.
+- **Back up…** saves every setting to a file, and **Restore…** writes a
+  backup back, showing the changes first. **Test rumble** checks vibration.
+
+The interface runs a small server on 127.0.0.1 only, protected by a
+per-session token, and stops by itself shortly after you close the page.
+
+### Command line
 
 ```sh
 cyclone2 info                          # firmware versions, active profile
