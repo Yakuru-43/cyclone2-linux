@@ -346,6 +346,12 @@ capture holds `0F 07 02`, then a full re-encode of bank 2, then `0F 07 01`.
 Each switch got the Ack `10 06 00`, which **confirms SwitchProfile**. GSC
 resent the first `0F 07 02` when its Ack was slow.
 
+**Written by our CLI and checked by feel** (`captures/17-…` to `20-…`):
+- `set deadzone lt=90` (`0F 03 01 01 F1 01 5A`): LT stayed at 0 until
+  nearly fully pressed, and RT was unaffected. `lt=5` restored it.
+- `set hair-trigger lt=adaptive` (`0F 03 01 01 FA 01 81`): LT jumped to full
+  after a short press. `lt=off` (`…00`) restored it.
+
 ### 4.7 Stick block (32 bytes)
 | +0 | +1 | +2 | +3 | +4 | +5 | +6 | +7 | +8 | +9 | +10–19 | +20 | +21 | +22 | +23 | +24 | +25 | +26 | +27–31 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
