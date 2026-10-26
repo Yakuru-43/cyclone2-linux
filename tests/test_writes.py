@@ -54,3 +54,17 @@ class Restore(unittest.TestCase):
         self.assertIsNotNone(P.check_restore(P.write_chunk(1, 0x2A0, b"\0" * 9)))
         self.assertIsNotNone(P.check_restore(P.write_chunk(0x30, 0, b"\1")))
         self.assertIsNotNone(P.check_restore(P.packet(0x17, 0x55, 0x88)))
+
+
+class DryRunMatchesDevice(unittest.TestCase):
+    def test_set_dry_run_equals_logged_packets(self):
+        # captures/12: what `set brightness 50` actually sent on the device
+        import json
+        from argparse import Namespace
+        from pathlib import Path
+        from cyclone2.cli import planned_packets
+        log = Path(__file__).resolve().parent.parent / "captures/12-cli-set-brightness.jsonl"
+        sent = [bytes.fromhex(json.loads(l)["hex"]) for l in open(log)
+                if json.loads(l)["dir"] == "out"][:4]
+        planned = planned_packets(Namespace(cmd="set", effect=3, value=50))
+        self.assertEqual(planned, sent)

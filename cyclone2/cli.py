@@ -47,9 +47,10 @@ def parse_bank(text):
 def planned_packets(args):
     if args.cmd == "set":
         f = light_brightness(args.effect)
-        return [P.read_chunk(LIGHT_BANK, 0, 1),
+        return [P.read_chunk(LIGHT_BANK, 0, 1),          # active effect
+                P.read_chunk(f.bank, f.offset, 1),        # old value, for the message
                 P.write_chunk(f.bank, f.offset, [args.value]),
-                P.read_chunk(f.bank, f.offset, 1)]
+                P.read_chunk(f.bank, f.offset, 1)]        # read-back
     if args.cmd == "info":
         return [P.fw_version(), P.current_profile()]
     banks = args.bank if args.cmd == "get" else list(ALL_BANKS)

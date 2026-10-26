@@ -409,6 +409,11 @@ brightness 0 → 50 → 0 in GSC sent `0F 03 20 01 78 01 32`, then
 preview, no reply). With the byte at 50 the LEDs lit, and they matched
 GSC's on-screen colours.
 
+**Written by our CLI** (2026-10-26, `captures/12-…`, `captures/13-…`):
+`cyclone2 set brightness 50`, then `0`, sent `0F 03 20 01 78 01 32` / `…00`.
+Each got Ack `10 06 00` and the read-back matched. The owner saw the LEDs
+light up and go off.
+
 So animation 0, frame 0, zone 0 is at 0x005. That matches InFract
 (0x0001 / 0x0003 / 0x0004 / 0x0005; animation 2 at 0x007D). **high**
 
