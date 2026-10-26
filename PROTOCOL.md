@@ -314,6 +314,13 @@ The 7-byte key block, then macro data:
 - So the **LT deadzone** is at 0x1F1 (front) and 0x1F2 (back), and the
   **RT deadzone** at 0x20D / 0x20E.
 
+**Confirmed by capture 04** (`captures/04-lt-deadzone.jsonl`): the LT
+deadzone slider sent writes at bank 1 +0x1F1 (dz_front 17 → … → 5), each
+also covering the recalculated curve points, as with the sticks. The same
+capture holds `0F 07 02`, then a full re-encode of bank 2, then `0F 07 01`.
+Each switch got the Ack `10 06 00`, which **confirms SwitchProfile**. GSC
+resent the first `0F 07 02` when its Ack was slow.
+
 ### 4.7 Stick block (32 bytes)
 | +0 | +1 | +2 | +3 | +4 | +5 | +6 | +7 | +8 | +9 | +10–19 | +20 | +21 | +22 | +23 | +24 | +25 | +26 | +27–31 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
