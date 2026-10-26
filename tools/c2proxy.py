@@ -54,37 +54,8 @@ RDESC = bytes.fromhex(
     " c0"
 )
 
-OPCODES = {
-    0x03: "WriteProfile", 0x04: "ReadProfile", 0x05: "ReadProfileAck",
-    0x06: "Ack", 0x07: "SwitchProfile", 0x09: "ReadFWVersion",
-    0x0A: "ReadFWVersionAck", 0x0B: "ReadCurrentProfile",
-    0x0C: "ReadCurrentProfileAck", 0x0D: "ReadRGB/SetLightStatus",
-    0x0E: "ReadRGBAck", 0x0F: "ProfileChanged", 0x10: "RefreshProfile",
-    0x11: "RefreshProfileAck", 0x16: "SetMacroStatus", 0x17: "QuickUpdate",
-    0x20: "Vibration", 0xF2: "HeartBeat", 0xFC: "EnterUpgradeMode",
-    0xFD: "SetCalibrationState",
-}
-WRITABLE_BANKS = {1, 2, 3, 4, 5, 0x20}
-DEVICE_ID_RANGE = range(0x039D, 0x03A4)  # GSC's device info / SetDeviceId
-
-
-def allowed(pkt):
-    """Return None if the output report may go to the controller, else why not."""
-    if len(pkt) < 2 or pkt[0] != 0x0F:
-        return "not a 0x0F command report"
-    op = pkt[1]
-    if op in (0x04, 0x09, 0x0B, 0x0D, 0x10, 0x16, 0x20, 0xF2):
-        return None
-    if op == 0x07:
-        return None if len(pkt) > 2 and 1 <= pkt[2] <= 5 else "bad profile number"
-    if op == 0x03:
-        bank, off, length = pkt[2], pkt[3] << 8 | pkt[4], pkt[5]
-        if bank not in WRITABLE_BANKS:
-            return f"write to bank 0x{bank:02x}"
-        if any(a in DEVICE_ID_RANGE for a in range(off, off + length)):
-            return "write to the device-ID range"
-        return None
-    return f"opcode 0x{op:02x} ({OPCODES.get(op, 'unknown')}) is not allowed"
+sys.path.insert(0, str(ROOT))
+from cyclone2.protocol import OPCODE_NAMES as OPCODES, check_gsc as allowed  # noqa: E402
 
 
 def find_real_device():
