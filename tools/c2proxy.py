@@ -91,7 +91,7 @@ def find_real_device():
         dev = node / "device"
         if "/virtual/" in str(dev.resolve()):
             continue
-        ids = dict(l.split("=", 1) for l in (dev / "uevent").read_text().split()
+        ids = dict(l.split("=", 1) for l in (dev / "uevent").read_text().splitlines()
                    if "=" in l)
         _, vid, pid = (int(x, 16) for x in ids.get("HID_ID", "0:0:0").split(":"))
         if vid != GAMESIR_VID or pid not in CONFIG_PIDS:
