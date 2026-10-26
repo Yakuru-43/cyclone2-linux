@@ -103,3 +103,16 @@ def light_color(effect, frame, zone):
         raise ValueError("effect 0-4, frame 0-7, zone 0-4")
     return Field(f"light.effect{effect}.frame{frame}.zone{zone}", LIGHT_BANK,
                  1 + 124 * effect + 4 + 15 * frame + 3 * zone, 3, 0, 255)
+
+
+STICKS = {"left": LEFT_STICK, "right": RIGHT_STICK}
+
+
+def stick_deadzone(bank, stick):
+    """Inner and outer deadzone of one stick in one profile bank, in percent.
+
+    Curve points are stored relative to this range (0-255 between inner and
+    outer), so changing the deadzone keeps the curve's shape."""
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.{stick}_stick.deadzone", bank, STICKS[stick] + 3, 2, 0, 100)

@@ -78,3 +78,59 @@ class DryRunMatchesDevice(unittest.TestCase):
                 if json.loads(l)["dir"] == "out"][:4]
         planned = planned_packets(Namespace(cmd="set", setting="brightness", effect=3, value=50))
         self.assertEqual(planned, sent)
+
+
+class FakeDevice:
+    """Records the packets Cyclone2's methods would send; data from a backup."""
+
+    def __init__(self, banks, profile=1):
+        self.banks = {b: bytearray(v) for b, v in banks.items()}
+        self.profile = profile
+        self.sent = []
+
+    def current_profile(self):
+        self.sent.append(P.current_profile())
+        return self.profile
+
+    def read(self, bank, offset, length):
+        self.sent.append(P.read_chunk(bank, offset, length))
+        return bytes(self.banks[bank][offset:offset + length])
+
+    def write(self, bank, offset, data):
+        self.sent.append(P.write_chunk(bank, offset, data))
+        self.banks[bank][offset:offset + len(data)] = data
+        return self.read(bank, offset, len(data))
+
+
+class Deadzone(unittest.TestCase):
+    def setUp(self):
+        from pathlib import Path
+        from cyclone2.cli import load_backup
+        self.banks = load_backup(Path(__file__).resolve().parent.parent
+                                 / "backups/2026-10-26-cli.json")
+
+    def run_set(self, value, profile=None):
+        from argparse import Namespace
+        from cyclone2.cli import cmd_set, planned_packets, stick_deadzone_value
+        args = Namespace(cmd="set", setting="deadzone", value=stick_deadzone_value(value),
+                         profile=profile)
+        dev = FakeDevice(self.banks)
+        cmd_set(dev, None, None, args)
+        planned = planned_packets(Namespace(**{**vars(args), "profile": profile or 1}))
+        return dev, planned
+
+    def test_dry_run_equals_what_cmd_sends(self):
+        for value in ("left=15", "right=12:95"):
+            dev, planned = self.run_set(value)
+            self.assertEqual(dev.sent, planned, value)
+            for pkt in dev.sent:
+                self.assertIsNone(policy(pkt), pkt[:8].hex(" "))
+
+    def test_left_inner_matches_capture_03(self):
+        dev, _ = self.run_set("left=20")
+        self.assertEqual(dev.sent[2][:7].hex(" "), "0f 03 01 02 29 01 14")
+
+    def test_refuses_inner_above_outer(self):
+        from cyclone2.device import DeviceError
+        with self.assertRaises(DeviceError):
+            self.run_set("left=100")
