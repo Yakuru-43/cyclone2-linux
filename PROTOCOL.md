@@ -133,138 +133,270 @@ keystrokes and mouse input.
 
 ## 2. Commands (vendor channel B)
 
-**Source for this section:** InFract, MIT, by Nicole Rivers
-(github.com/NaokoAF/InFract, commit 6d54c5d, 2026-07-01). Files:
-`Drivers/GameSir/Cyclone2Notes.md`, `Drivers/GameSir/Cyclone2Driver.cs`, and
-`Gamepads/GameSir/Cyclone2/*.cs`. This is third-party reverse engineering
-that we have **not yet** checked against GameSir Connect's code (step 3) or
-captures (step 4). Everything here is **medium** unless marked otherwise.
-InFract's own author flags parts of it as uncertain.
+**Sources.** The primary source is GameSir Connect v1.14.5,
+`dist/electron/main.js` inside `app.asar`. Line numbers ("l.") refer to
+`vendor/pretty/main.js`, our Prettier 3.3.3 rendering at
+`--print-width 120` (local only, not committed). Key places:
+- command builder `Ro`: l. 14883
+- reply decoder `wo`/`xo`: l. 15244–15355
+- constants `Ya.Values`: l. 14277
+- Cyclone 2 class `ys`: l. 15547–16044
+- profile codecs `$a`: l. 14436, and `qo`: l. 15399, with helpers at l. 8382–8960
+- device catalogue: l. 36650–36735
+
+The cross-check is InFract @6d54c5d (MIT, by Nicole Rivers). Where GSC's
+code and InFract agree, the confidence is **high**. Nothing is **confirmed**
+until it has been seen on the device (steps 4–5).
 
 ### 2.1 Framing
-- Host → device: output report **0x0F**. Byte 0 after the report ID is the
-  command, followed by its arguments, padded to 63 bytes (64 on the wire).
-  InFract writes Heartbeat as just 2 bytes (`0F F2`) and Rumble as a full,
-  zero-padded 64-byte report.
-- Device → host: input report **0x10**, carrying replies. Byte 0 after the ID
-  is the reply code.
-- Device → host: input report **0x12**, an input-state stream. It only flows
-  while heartbeats keep arriving (§2.3).
-- No checksum or CRC appears in InFract's packets. (Step 3 checks whether GSC
-  adds one.)
+- **Host → device:** output report **0x0F**, with the opcode in byte 1. GSC
+  builds short arrays (for example `[15, 9]`), and node-hid on Windows sends
+  the full 64-byte report, zero-padded. **Our tool always sends 64 bytes,
+  zero-padded.** **high**
+- **Device → host:** report **0x10** carries replies, opcode in byte 1 (§2.3).
+  Report **0x12** is the input stream (§2.4).
+- **Lockstep.** GSC's queue (`writeWithAck`) sends one command, waits for any
+  recognised reply, then sends the next. **high**
+- **No checksum or CRC** in the framing or in the profile data (§3). **high**
 
-### 2.2 Command table
+### 2.2 Host → device opcodes (byte 1 of report 0x0F)
 
-"Kind" says what a command does to the device: **read** (no state change),
-**volatile** (changes run-time state only, gone on power-off), or **write**
-(changes stored settings or the active profile).
+Kinds: **read** = no state change; **volatile** = run-time state only;
+**write** = changes stored settings or the active profile.
 
-| Dir | Code | Name | Arguments / payload | Reply | Kind |
+| Op | GSC builder (`Ro.*`) | Bytes after `0F` | Kind | Reply | Notes |
 |---|---|---|---|---|---|
-| out | 0xF2 | Heartbeat | none | 0x12 stream starts | volatile |
-| out | 0x09 | Firmware info | none | 0x0A | read |
-| in | 0x0A | Firmware info reply | 16 bytes "unicode": first 8 = controller version, last 8 = dongle version | | |
-| out | 0x0B | Get profile | none | 0x0C | read |
-| in | 0x0C | Get profile reply | `XX` = current profile (1–4) | | |
-| out | 0x04 | Read register | `bank, addr_hi, addr_lo, len` (len ≤ 58) | 0x05 | read |
-| in | 0x05 | Read register reply | `bank, addr_hi, addr_lo, len, data…` | | |
-| out | 0x10 | Read register (alt) | same as 0x04 | 0x11 | read. *Guess (InFract):* reads live memory rather than flash. GSC uses it after 0x0F. |
-| in | 0x11 | Read register (alt) reply | header + data | | |
-| out | 0x03 | Write register | `bank, addr_hi, addr_lo, len, data…` | 0x06 | **write** |
-| out | 0x07 | Set profile | `XX` (1–4) | 0x06 | **write** |
-| in | 0x06 | Ack | none (reply to 0x03 and 0x07) | | |
-| out | 0x06 | "Registers loaded" (?) | none; GSC sends it at startup after reading all registers | ? | **unknown**, treat as write |
-| out | 0x0D | Select RGB keyframe | `01 XX` | ? | **unknown**, treat as write |
-| out | 0x20 | Rumble | `66 55 L R` (`66 55` unexplained) | none | volatile |
-| in | 0x0F | Register changed | `bank, addr_hi, addr_lo, len_hi?, len_lo`, no data; sent when the user changes a setting with the M button | | |
+| 0x04 | getReadProfileCommand | `04 bank offH offL len` (len ≤ 58) | read | 05 | GSC reads whole banks in 58-byte chunks |
+| 0x09 | getReadFWVersionCommand | `09` | read | 0A | |
+| 0x0B | getReadCurrentProfileCommand | `0B` | read | 0C | |
+| 0x10 | getRefreshProfileCommandByOffset | `10 bank offH offL len` | read | 11 | used after a 0F "ProfileChanged" |
+| 0x0D | getReadRGBCommand | `0D` | read | 0E | |
+| 0xF2 | getHeartBeatCommand | `F2 00` | volatile | — | keeps the 0x12 stream flowing |
+| 0x20 | getVibrationCommand | `20 66 55 L R` | volatile | — | GSC sends `L=R=0` after the test duration |
+| 0x0D | getSetLightStatusCommand | `0D play frame` | volatile? | ? | LED preview (play/pause, frame) |
+| 0x16 | getSetMacroStatusCommand | `16 key state` (key 1 = L4, 2 = R4) | volatile? | ? | macro recording |
+| 0x03 | getWriteProfileCommand | `03 bank offH offL len data…` (≤ 58 data bytes) | **write** | 06 | GSC writes only the changed byte range |
+| 0x07 | getSwitchProfileCommand | `07 n` (1–4; Shift = 5) | **write** | 06 | |
+| 0x01 / 0x02 | Enter/ExitProfileConfig | `01` / `02 b` | ? | | not used by the Cyclone 2 class |
 
-Notes:
-- **Heartbeat.** GSC sends it once a second, InFract every 500 ms. On the
-  dongle the 0x12 stream is limited to 200 Hz.
-- **What InFract actually sends:** only Heartbeat and Rumble, never a
-  register write. Those two are proven harmless only to the extent that
-  InFract users run them.
+**Forbidden.** Our tool must never send these:
 
-### 2.3 Input stream (report 0x12), 63 bytes
+| Op | GSC builder | Bytes after `0F` | Why |
+|---|---|---|---|
+| **0x17** | getQuickUpdateCommand | `17 55 88` | Sent when the user confirms a firmware update (`reqQuickUpdate`); GSC then sets `isManualUpdating`. *Guess (medium):* reboots the controller into update mode (§5). |
+| **0xFC** | getEnterUpgradeModeCommand | `FC` | Enters upgrade mode. The reply decoder calls opcode 0xFC "RequestToUpgrade". |
+| **0xFD** | getSetCalibrationStateCommand | `FD n` | Stick/trigger calibration state. |
+| 0x03 → 0x039E | getSetDeviceIdCommand | `03 bank 03 9E 06` + 6 ASCII bytes | Overwrites the device ID. |
+| 0x08, 0x12, 0x14, 0xF0 | (decoder names only) | | WriteProfileToEEPRom, WriteEEPRom, ReadEEPRom, Download. No builder exists in GSC. |
 
-Uses the DS4 layout, plus "raw" values (before remapping and deadzones) in
-bytes 53–61. Offsets exclude the report ID.
+### 2.3 Device → host replies (byte 1 of report 0x10)
+
+Decoder `wo`, l. 15277:
+
+| Op | Name | Layout / handling in GSC |
+|---|---|---|
+| 0x05 | ReadProfileAck | `10 05 bank offH offL len data…`, with data from byte 6. Once `off + len` equals the bank size (680, or 635 for bank 0x20), GSC treats it as "ReadProfileComplete". |
+| 0x06 | Ack | `10 06 01` means "AckWithBusy" (GSC logs it and keeps waiting). |
+| 0x0A | ReadFirmwareVersionAck | `resolveFwVersion`: controller = bytes 4–8 and dongle = bytes 12–16, as text. Spaces and NULs are stripped and the characters joined with "." (so "346" → "3.4.6"). InFract describes "16 bytes unicode". *To observe.* |
+| 0x0C | ReadCurrentProfileAck | `10 0C n`. GSC treats 0 as 1. If n > 4 or n is Shift, **GSC itself switches to profile 1** (a write); our tool must not copy that. |
+| 0x0E | ReadRGBAck | |
+| 0x0F | ProfileChanged | `10 0F bank offH offL lenH lenL`. The user changed something on the controller; GSC re-reads that range with 0x10. Bank 0x30 means the profile number changed. |
+| 0x11 | RefreshProfileAck | same layout as 0x05 |
+| 0x01–0x04, 0x07–0x09, 0x0B, 0x0D, 0x10 | echoes of the request opcodes | |
+| 0x08, 0x12–0x15, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xFC | EEPROM, Download, HeartBeat, KeyStatus, RequestToUpgrade | names only |
+
+### 2.4 Input stream (report 0x12)
+- GSC treats any report with byte 0 = 18 as gamepad state. Offsets below
+  **include** the report ID at byte 0.
+- `parseGamepadState` (l. ~15770) reads byte 35 = charge state, 36 = battery
+  level, and 37 = active light config index. Bytes 38–52 are the 5 live LED
+  colours (R, G, B) in the order Home, LowerLeft, LowerRight, UpperLeft,
+  UpperRight. Byte 53, bits 0 and 1: macro recording; bits 4 and 5: which
+  back button. **high**
+- **Conflict:** InFract puts DS4 touchpad data at bytes 34–41 (excluding the
+  ID, so 35–42 including it). That overlaps what GSC parses as
+  battery/LED. GSC's code wins; resolve by observation.
+- InFract's layout, offsets **excluding** the ID (add 1 for report offsets),
+  is **medium**:
 
 | Offset | Field |
 |---|---|
 | 0–3 | LX, LY, RX, RY (u8) |
-| 4–5 | buttons: bits 0–3 D-pad (0=N, clockwise to 7=NW, other = released), 4 X, 5 A, 6 B, 7 Y, 8 LB, 9 RB, 10 LT, 11 RT, 12 View, 13 Menu, 14 LS, 15 RS |
-| 6 | special: bit 0 Home, 1 Share, 3 L4, 4 R4, 5 M. L4, R4 and M only show in the raw copy (byte 59). |
+| 4–5 | buttons: bits 0–3 D-pad (0 = N, clockwise to 7 = NW, other = released), 4 X, 5 A, 6 B, 7 Y, 8 LB, 9 RB, 10 LT, 11 RT, 12 View, 13 Menu, 14 LS, 15 RS |
+| 6 | special: bit 0 Home, 1 Share, 3 L4, 4 R4, 5 M (L4, R4 and M only in the raw copy at 59) |
 | 7–8 | LT, RT (u8) |
 | 9–10 | timestamp, u16 LE, units of 5.33 µs |
 | 12–23 | gyro X/Y/Z (±2000 °/s), accel X/Y/Z (±4 g), i16 LE |
-| 34–41 | touchpad slots (DS4 format) |
 | 53–61 | raw LX, LY, RX, RY, raw buttons (57–58), raw special (59), raw LT, RT |
-
-### 2.4 Registers
-
-Address = (bank, 16-bit big-endian address). Values from InFract's
-`Cyclone2Registry.cs`.
-
-| Bank | Address | Meaning | Values |
-|---|---|---|---|
-| 1–4 (per profile) | 0x0020 | left rumble strength | 0–100 |
-| 1–4 | 0x0021 | right rumble strength | 0–100 |
-| 1–4 | 0x002E | polling rate | 0 = 250 Hz, 1 = 500 Hz, 2 = 1000 Hz |
-| 0x20 (RGB) | 0x0000 | active RGB profile | ? |
-| 0x20 | 0x0001 | RGB profile 1: keyframe count | 1–8 |
-| 0x20 | 0x0003 | RGB 1: speed | 0–20 (higher = slower) |
-| 0x20 | 0x0004 | RGB 1: brightness | 0–100 |
-| 0x20 | 0x0005 / 0x0008 / 0x000B / 0x000E / 0x0011 | RGB 1 colours: left / right / unknown / Home / dots | 3 bytes each (*guess:* R, G, B) |
-| 0x20 | 0x007D / 0x00F9 / 0x0175 | RGB profiles 2 / 3 / 4: keyframe count | so each RGB profile is 0x7C (124) bytes apart |
-| 0x30 | 0x0000 | selected profile | 1–4 |
 
 ### 2.5 Send policy for our tool
 
-The CLI talks only to vendor channel B, on 3537:1053 or 3537:100b, and checks
-every outgoing command against an **allow-list**. There is no deny-list:
-anything not listed is refused.
-- Allowed from step 5 on, once the owner approves the first packet: 0x09,
-  0x0B, 0x04 (reads), and 0xF2 (volatile, needed for the input stream).
-- Allowed only after per-command approval in step 6: 0x03, 0x07, and whatever
-  step 3 finds RGB needs.
-- Never: any code that step 3 links to firmware update, bootloader or DFU,
-  whatever its name. Nothing ever goes on the idle dongle (3537:0575) or its
-  channel A.
+The CLI talks only to vendor channel B (usage page 0xFFF0) on 3537:1053 or
+3537:100b. It checks every outgoing packet against an **allow-list** of
+(opcode, argument-shape) pairs; there is no deny-list, so anything else is
+refused.
+- **Step 5 (reads)**, after the owner approves the first packet: `09`, `0B`,
+  `04 bank off len` with bank ∈ {1–5, 0x20, 0x30} and off + len within the
+  bank, `10` (same constraint), `0D` (no arguments), and `F2 00`.
+- **Step 6 (writes)**, each new kind approved individually: `03` restricted
+  to the field ranges in §4 that a command needs, never 0x039D–0x03A3;
+  `07 n` with n ∈ 1–4.
+- **Never:** everything in the forbidden table, plus any opcode not listed
+  above. Nothing ever goes to the idle dongle (3537:0575) or its channel A.
 
 ## 3. Checksums / CRC
 
-(none yet)
+**None.** GSC's write path (`writeProfile`, l. ~15925) diffs the newly
+serialized bank against the last one read and sends the raw changed bytes.
+The serializers (`$a.fromModel`, `qo.fromModel`) compute no sum or CRC.
+**high**
 
 ## 4. Settings → bytes
 
-(none yet)
+### 4.1 Banks
+| Bank | Size | Contents |
+|---|---|---|
+| 1–4 | 680 | profiles 1–4 |
+| 5 | 680 | "Shift" layer |
+| 0x20 | 635 | Light (RGB), shared by all profiles |
+| 0x30 | ? | current profile number at offset 0 (InFract; GSC uses 0x30 as "CurrentOfProfileNumber") |
+
+### 4.2 Profile bank layout (680 bytes), from `$a.fromBytes`/`fromModel`
+
+| Offset | Size | Field |
+|---|---|---|
+| 0x000 | 32 | profile name, UTF-8, NUL-padded |
+| 0x020 | 32 | Fun_Data (§4.3) |
+| 0x040 | 16 × 7 | key blocks (§4.4), in the order Up, Down, Left, Right, LB, RB, LS, RS, A, B, X, Y, Home, View, Menu, Share. Key *i* is at 0x040 + 7*i*. |
+| 0x0B0 | 159 | L4 back button (§4.5) |
+| 0x14F | 159 | R4 back button |
+| 0x1EE | 28 | LT trigger (§4.6) |
+| 0x20A | 28 | RT trigger |
+| 0x226 | 32 | left stick (§4.7) |
+| 0x246 | 32 | right stick |
+| 0x266 | 33 | motion "Aim" (§4.8) |
+| 0x287 | 33 | motion "Tilt" |
+
+GSC names the face buttons the PlayStation way: CRO = A, CIR = B, SQU = X,
+TRI = Y, PS = Home, Sel = View, Sta = Menu, Camera = Share, FL1/FR1 = L4/R4.
+
+### 4.3 Fun_Data (0x020–0x03F)
+| Offset | Field | Values |
+|---|---|---|
+| 0x020 / 0x021 / 0x022 / 0x023 | motor left / right / LT / RT | raw 0, 25, 50, 75, 100 = UI levels 0–4 (`D()`/`L()`, l. 8605). Default UI level 3 (raw 75). |
+| 0x024–0x028 | audio: enable, volume, mixer, mic mute, mic sensitivity | |
+| 0x029 / 0x02A | shift enable / shift value | |
+| 0x02B | D-pad diagonal lock | bit 0 |
+| 0x02C / 0x02D | XInput / Switch ABXY swap | bit 0 |
+| 0x02E | report rate | 0 = 250 Hz, 1 = 500, 2 = 1000 (meaning from InFract; GSC passes the raw value) |
+| 0x02F–0x03F | reserved | |
+
+### 4.4 Key block (7 bytes)
+`turbo_en, turbo_speed, map_en, map_value1, map_value2, map_value3, toggle_en`.
+`map_value*` are key codes from GSC's table `Xa` (`getKeyMapValue` /
+`getButtonKey`, **not yet extracted**: needed for remapping). Turbo:
+`turbo_en = speed > 0`.
+
+### 4.5 Back-button block (159 bytes)
+The 7-byte key block, then macro data:
+- flags byte: bit 0 enabled, bit 1 press-to-trigger, bit 2 cycle;
+- cycle time (BE16), then step count (≤ 30);
+- 30 steps of `key, hold BE16, delay BE16`. The last step has no delay.
+
+### 4.6 Trigger block (28 bytes)
+| +0 | +1 | +2 | +3 | +4 | +5 | +6 | +7 | +8–10 | +11 | +12 | +13 | +14 | +15 | +16 | +17 | +18–27 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| turbo_en | turbo_speed | dz_en | **dz_front** | **dz_back** | anti_front | anti_back | map_en | map_value1–3 | toggle | **hair: status** | hair start | hair end | curve_en | curve type | curvature | 5 × (orig, target) |
+
+- Deadzones are stored as the UI percentages. GSC's defaults are
+  5 / 95 / 0 / 100.
+- Hair trigger status = `0x80 | mode` (mode 1 or 2), or 0 when off.
+- So the **LT deadzone** is at 0x1F1 (front) and 0x1F2 (back), and the
+  **RT deadzone** at 0x20D / 0x20E.
+
+### 4.7 Stick block (32 bytes)
+| +0 | +1 | +2 | +3 | +4 | +5 | +6 | +7 | +8 | +9 | +10–19 | +20 | +21 | +22 | +23 | +24 | +25 | +26 | +27–31 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| stick_en | square | dz_en | **dz_front** | **dz_back** | anti_front | anti_back | curve_en | type | curvature | 5 × (orig, target) | map_en | x_flip | y_flip | axis_ratio | mouse_dpi | output | cross | up, down, left, right, outline |
+
+- Deadzones are stored as percentages. GSC's defaults are 10 / 100 / 0 / 100.
+- Curve points are scaled to 0–255 between the deadzones: point 1 is
+  (0, 0), point 5 is (255, 255).
+- So the **left-stick deadzone** is at 0x229 / 0x22A, and the **right-stick
+  deadzone** at 0x249 / 0x24A.
+
+### 4.8 Motion block (33 bytes)
+`activate behaviour, quick key, active axis` (bit 0 / bit 1), followed by the
+same deadzone, curve and map sub-blocks as a stick.
+
+### 4.9 Light bank (0x20, 635 bytes), from `qo` (l. 15399)
+| Offset | Field |
+|---|---|
+| 0x000 | active effect (0–3; GSC reads >3 as 0) |
+| 0x001 + 124*k* | animation *k* (0–4) |
+| 0x26D | audio-reactive (bit 0) |
+| 0x26E | user effect index |
+| 0x26F–0x271 | "ProfileLed" R, G, B |
+| 0x272 | raise-to-wake (bit 0) |
+| 0x273 | standby time |
+| 0x274–0x27A | reserved |
+
+Animation layout (124 bytes):
+- `+0` keyframe count (1–8), `+1` effect count;
+- `+2` **speed, stored as 20 − UI speed** (0–20);
+- `+3` **brightness** (0–100);
+- `+4 + 15f + 3z`: frame *f* (0–7), zone *z* (0–4), as R, G, B.
+
+So animation 0, frame 0, zone 0 is at 0x005. That matches InFract
+(0x0001 / 0x0003 / 0x0004 / 0x0005; animation 2 at 0x007D). **high**
+
+Zone order is **unresolved**. GSC names the live-state zones Home,
+LowerLeft, LowerRight, UpperLeft, UpperRight; InFract labels the frame zones
+left, right, unknown, Home, dots. To settle with a capture.
+
+### 4.10 Target settings → where they live
+| Setting | Location | Confidence |
+|---|---|---|
+| RGB colour / brightness / speed | bank 0x20: active effect + animation fields | high (two sources) |
+| Vibration strength | bank *n*, 0x020–0x023 | high |
+| Stick deadzones | bank *n*, 0x229–0x22C (L) / 0x249–0x24C (R) | high (GSC only) |
+| Trigger deadzones | 0x1F0–0x1F4 (LT) / 0x20C–0x210 (RT); hair trigger at +12–14 | high (GSC only) |
+| Button remapping | key blocks 0x040–0x0AF, back buttons 0x0B0/0x14F; needs the `Xa` code table | medium |
+| Profiles | read: `0B` / bank 0x30; switch: `07 n` | high |
 
 ## 5. Firmware-update paths (must never be triggered)
 
-This section lists what to avoid. None of it is to be implemented.
+None of this is to be implemented. It is here so we know what to avoid.
 
-Evidence: GameSir Connect v1.14.5 installer (`GameSir Connect Setup.exe`,
-NSIS 3.03 → `$PLUGINSDIR/app-32.7z`), Electron 13.6.9 ia32, extracted locally
-(not committed).
-
-- `resources/dfu/` holds the update code and tools: JieLi
-  (`jl_firmware_upgrade_x86.dll`, `JL_upgradeUtility_x86.dll`), the "SAPJoyUni"
-  SDK used by T3P/T4N2 controllers (`sapjoyuniapis_*.dll`), a USB
-  mass-storage ("udisk") updater (`uDiskDfuUtil.ts`, `udiskUpgradWoker.js`),
-  and worker scripts (`upgradWoker.js`, `t3proUpdateWorker.js`). Confidence
-  **high** that these exist; their exact roles are **medium**, inferred from
-  their names.
-- `resources/dfu/packages/` bundles 48 firmware images (`.ufw`). Ten are for
-  the Cyclone 2: `GS_C2_DEVICE_V123_{Key,No_Key}`,
-  `GS_C2_ADC_DEVICE_V{346,352}_{Key,No_Key}`,
-  `GS_C2_Dongle_V{119,121}_{Key,No_Key}`. So the app can flash with no network.
-  **high**
-- The app polls for disks at startup (`getAllOfDisks` via PowerShell in its
-  log). *Guess:* this looks for a device in mass-storage update mode.
-- `main.js`: an IPC event `Update_KZ {deviceId, packagePath}` posts
-  `{action: "startDfu"}` to the T3P update worker. **high** (read in the code);
-  what triggers it is not yet traced.
-- To do (step 3): find what triggers each update path, whether it starts
-  without user confirmation, and which report or command enters update or
-  bootloader mode. Those bytes go on a deny-list in the CLI.
+- **Bundled images.** `resources/dfu/packages/` holds 48 `.ufw` images
+  (quarantined locally). The catalogue links the Cyclone 2 to
+  `GS_C2_DEVICE_V123` (older variant, PIDs 0x101D/0x102A),
+  `GS_C2_ADC_DEVICE_V352` (our controller, PID 0x1053) and
+  `GS_C2_Dongle_V121` (PID 0x100B). **high**
+- **Decision.** `getDfuPackage` (l. 37406):
+  - `hasUpdate` = the bundled version is newer than the device's;
+  - `mustUpdateFirst = hasUpdate && current < MinimumVersion`. The Cyclone 2
+    entries have no `MinimumVersion`, so it is **false**.
+  - For our hardware (V3.4.6 / V1.2.0) GSC will show "update available" but
+    will not demand it. **high**
+  - `appConfig.enableFirmwareUpdate: false` exists but nothing reads it.
+- **Triggers.** Only user actions, from static search of `renderer.js`:
+  - the update dialog's `update()` (l. ~71527) → `reqQuickUpdate`;
+  - `confirmUpdate()` (l. ~105486) → `reqQuickUpdateWithPrompt`.
+  - `reqDfu` and `reqAutoDfu` have listeners in `main.js` but no emitter
+    turned up in either bundle. Confidence **medium**: the static search
+    cannot rule out dynamically built event names.
+- **Mechanism.** For the Cyclone 2, `reqQuickUpdate` → `0F 17 55 88`.
+  *Guess (medium):* the controller re-enumerates as a removable disk.
+  `uDiskDfuUtil.ts` finds removable disks via PowerShell, then `wmic`, then
+  by guessing drive letters D–J. It identifies the disk and flashes it
+  through the JieLi DLL (`JL_queryDevicePidVid`, `JL_loadFirmware`). Chip
+  types it tries: 695, AD160, AC632N (dongle), JL703N.
+- **Consequence for us:**
+  - Under Wine, PowerShell and `wmic` are missing, and the JieLi DLL needs
+    raw disk access. An update started under Wine could leave the
+    controller **stuck in update mode**, and GameSir's forced update
+    (Logo + Menu) relies on the same disk path. **Wine is therefore not a
+    recovery path.** A real Windows install (VM with USB passthrough, or a
+    PC) is needed before the first write.
+  - During captures: never click Update or accept any update prompt in GSC.

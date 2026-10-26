@@ -11,8 +11,15 @@ not negotiable.
   confirmed read (output report, feature report, SET_REPORT), show the exact
   bytes, explain the expected effect, and wait for the owner's explicit OK.
   One OK covers one command.
-- Until PROTOCOL.md says which vendor channel is configuration and which is
-  update, send nothing on either.
+- Only vendor channel B (usage page 0xFFF0) on 3537:1053 / 3537:100b, and only
+  packets on the allow-list in PROTOCOL.md §2.5. Never send `0F 17` (quick
+  update), `0F FC` (enter upgrade mode), `0F FD` (calibration), writes to
+  0x039D–0x03A3 (device ID), or any opcode not on the allow-list. Never send
+  anything to the idle dongle (3537:0575) or its channel A (0xFF32).
+- Under Wine, GameSir Connect cannot recover a controller stuck in update
+  mode: its udisk updater needs PowerShell or wmic and raw disk access
+  (PROTOCOL.md §5). Never click Update or accept an update prompt in GSC.
+  Require a real Windows install before the first write.
 - If the controller stops responding, tell the owner immediately. Recovery is
   GameSir's forced update: hold Logo + Menu while plugging in, with GameSir
   Connect open on Windows. As of 2026-10-26 the owner has NO Windows VM; the
