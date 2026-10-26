@@ -364,6 +364,12 @@ moving the left-stick deadzone slider sent writes at bank 1 +0x229, covering
 deadzone (`S()`, §4.9 of the code notes). Every slider tick is a separate
 write.
 
+**Written by our CLI and checked by feel** (`captures/15-…`, `16-…`):
+`cyclone2 set deadzone left=90` wrote only `0F 03 01 02 29 01 5A`. In Steam's
+input test, the left stick then registered only near full deflection and the
+right stick was unaffected. `left=10` restored it. The deadzone is applied
+by the controller itself, before the XInput reports.
+
 **GSC re-encodes the whole profile on the first edit after loading.** In
 capture 03, before the first slider value, GSC wrote bank 1 from 0x041 to
 0x2A1 (12 chunks). Compared with the factory bytes
