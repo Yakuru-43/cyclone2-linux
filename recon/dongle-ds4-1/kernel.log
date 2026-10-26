@@ -1,0 +1,11 @@
+2026-10-26T19:48:53+01:00 Host-001 kernel: usb 1-10: USB disconnect, device number 17
+2026-10-26T19:48:54+01:00 Host-001 kernel: usb 1-10: new full-speed USB device number 18 using xhci_hcd
+2026-10-26T19:48:54+01:00 Host-001 kernel: usb 1-10: New USB device found, idVendor=054c, idProduct=09cc, bcdDevice= 1.20
+2026-10-26T19:48:54+01:00 Host-001 kernel: usb 1-10: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+2026-10-26T19:48:54+01:00 Host-001 kernel: usb 1-10: Product: Wireless Controller
+2026-10-26T19:48:54+01:00 Host-001 kernel: usb 1-10: Manufacturer: Guangzhou Chicken Run Network Technology Co., Ltd.
+2026-10-26T19:48:54+01:00 Host-001 kernel: playstation 0003:054C:09CC.0012: hidraw0: USB HID v1.11 Gamepad [Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller] on usb-0000:03:00.0-10/input0
+2026-10-26T19:48:54+01:00 Host-001 kernel: input: Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:054C:09CC.0012/input/input65
+2026-10-26T19:48:54+01:00 Host-001 kernel: input: Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller Motion Sensors as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:054C:09CC.0012/input/input66
+2026-10-26T19:48:54+01:00 Host-001 kernel: input: Guangzhou Chicken Run Network Technology Co., Ltd. Wireless Controller Touchpad as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:054C:09CC.0012/input/input67
+2026-10-26T19:48:54+01:00 Host-001 kernel: playstation 0003:054C:09CC.0012: Registered DualShock4 controller hw_version=0x0000b404 fw_version=0x0000a007

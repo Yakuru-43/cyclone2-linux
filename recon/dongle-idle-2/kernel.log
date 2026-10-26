@@ -1,0 +1,8 @@
+2026-10-26T19:47:24+01:00 Host-001 kernel: usb 1-10: new full-speed USB device number 15 using xhci_hcd
+2026-10-26T19:47:24+01:00 Host-001 kernel: usb 1-10: New USB device found, idVendor=3537, idProduct=0575, bcdDevice= 1.20
+2026-10-26T19:47:24+01:00 Host-001 kernel: usb 1-10: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+2026-10-26T19:47:24+01:00 Host-001 kernel: usb 1-10: Product: GameSir-Cyclone 2
+2026-10-26T19:47:24+01:00 Host-001 kernel: usb 1-10: Manufacturer: Guangzhou Chicken Run Network Technology Co., Ltd.
+2026-10-26T19:47:24+01:00 Host-001 kernel: input: Guangzhou Chicken Run Network Technology Co., Ltd. GameSir-Cyclone 2 Consumer Control as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:3537:0575.000F/input/input56
+2026-10-26T19:47:24+01:00 Host-001 kernel: input: Guangzhou Chicken Run Network Technology Co., Ltd. GameSir-Cyclone 2 as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:3537:0575.000F/input/input57
+2026-10-26T19:47:24+01:00 Host-001 kernel: hid-generic 0003:3537:0575.000F: input,hiddev96,hidraw0: USB HID v1.11 Device [Guangzhou Chicken Run Network Technology Co., Ltd. GameSir-Cyclone 2] on usb-0000:03:00.0-10/input0

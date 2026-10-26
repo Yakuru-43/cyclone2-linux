@@ -1,0 +1,10 @@
+@0000 len= 18 DEVICE                 12 01 00 02 00 00 00 40 37 35 0b 10 20 01 00 02 03 01
+@0012 len=  9 CONFIGURATION          09 02 50 00 02 01 00 80 fa
+@001b len=  9 INTERFACE              09 04 00 00 02 ff 5d 01 00
+@0024 len= 16 HID (or vendor 0x21)   10 21 10 01 01 24 82 14 03 00 03 13 02 00 03 00
+@0034 len=  7 ENDPOINT               07 05 82 03 20 00 01
+@003b len=  7 ENDPOINT               07 05 02 03 20 00 08
+@0042 len=  9 INTERFACE              09 04 01 00 02 03 00 00 00
+@004b len=  9 HID (or vendor 0x21)   09 21 10 01 00 01 22 d6 00
+@0054 len=  7 ENDPOINT               07 05 84 03 40 00 01
+@005b len=  7 ENDPOINT               07 05 04 03 40 00 05

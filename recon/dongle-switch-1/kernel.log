@@ -1,0 +1,13 @@
+2026-10-26T19:48:36+01:00 Host-001 kernel: usb 1-10: USB disconnect, device number 16
+2026-10-26T19:48:36+01:00 Host-001 kernel: usb 1-10: new full-speed USB device number 17 using xhci_hcd
+2026-10-26T19:48:37+01:00 Host-001 kernel: usb 1-10: New USB device found, idVendor=057e, idProduct=2009, bcdDevice= 1.20
+2026-10-26T19:48:37+01:00 Host-001 kernel: usb 1-10: New USB device strings: Mfr=0, Product=2, SerialNumber=0
+2026-10-26T19:48:37+01:00 Host-001 kernel: usb 1-10: Product: Pro Controller
+2026-10-26T19:48:37+01:00 Host-001 kernel: nintendo 0003:057E:2009.0011: hidraw0: USB HID v82.01 Joystick [Pro Controller] on usb-0000:03:00.0-10/input0
+2026-10-26T19:48:37+01:00 Host-001 kernel: nintendo 0003:057E:2009.0011: controller MAC = D0:56:81:37:B2:30
+2026-10-26T19:48:37+01:00 Host-001 kernel: nintendo 0003:057E:2009.0011: using factory cal for left stick
+2026-10-26T19:48:37+01:00 Host-001 kernel: nintendo 0003:057E:2009.0011: using factory cal for right stick
+2026-10-26T19:48:37+01:00 Host-001 kernel: nintendo 0003:057E:2009.0011: using factory cal for IMU
+2026-10-26T19:48:37+01:00 Host-001 kernel: nintendo 0003:057E:2009.0011: assigned player 1 led pattern
+2026-10-26T19:48:37+01:00 Host-001 kernel: input: Pro Controller (IMU) as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:057E:2009.0011/input/input64
+2026-10-26T19:48:37+01:00 Host-001 kernel: input: Pro Controller as /devices/pci0000:00/0000:00:01.3/0000:03:00.0/usb1/1-10/1-10:1.0/0003:057E:2009.0011/input/input63

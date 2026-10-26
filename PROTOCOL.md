@@ -15,15 +15,36 @@ evidence behind each claim.
 
 | Connection | Mode | VID:PID | bcdDevice | Interfaces | Evidence | Confidence |
 |---|---|---|---|---|---|---|
-| 2.4 GHz dongle, controller off | (none linked) | 3537:0575 | 1.20 | 1 × HID (03/00/00) | `recon/dongle-ctrl-off/` | **confirmed**: the device disappeared when only the dongle was unplugged |
+| 2.4 GHz dongle, controller off | (none linked) | 3537:0575 | 1.20 | 1 × HID (03/00/00) | `recon/dongle-idle-{1,2}/` (identical) | **confirmed**: the device disappeared when only the dongle was unplugged |
 | USB cable, controller off | n/a | (does not enumerate) | | | kernel log 2026-10-26 19:24 | **confirmed** |
 | USB cable | XInput (green LED) | 3537:1053 | 3.46 | if0 XInput (ff/5d/01, `xpad`) + if1 HID | `recon/usb-xinput-{1,2,3}/` (identical) | **confirmed** |
 | USB cable | Switch | 057e:2009 | 3.46 | 1 × HID (Pro Controller layout) | `recon/usb-switch-1/` | **confirmed** |
 | USB cable | DS4 (blue LED) | 054c:09cc | 3.46 | 1 × HID (DualShock 4 layout) | `recon/usb-ds4-{1,2}/` (identical) | **confirmed** |
+| 2.4 GHz dongle, controller linked | XInput (green) | 3537:100b | 1.20 | if0 XInput (`xpad`) + if1 HID | `recon/dongle-xinput-{1,2}/` (identical) | **confirmed** |
+| 2.4 GHz dongle, controller linked | Switch (red) | 057e:2009 | 1.20 | 1 × HID | `recon/dongle-switch-1/` | **confirmed** |
+| 2.4 GHz dongle, controller linked | DS4 (blue) | 054c:09cc | 1.20 | 1 × HID | `recon/dongle-ds4-1/` | **confirmed** |
 
 VID 0x3537 is "Guangzhou Chicken Run Network Technology Co., Ltd." (GameSir).
 In Switch and DS4 modes the controller borrows Nintendo's and Sony's IDs.
-Only XInput mode has a USB serial string (kept in git-ignored `private/`).
+
+- **The dongle changes identity.** On its own it is 3537:0575, with vendor
+  channels A and B. Once the controller links (about 7 s after power-on), it
+  re-enumerates as whatever mode the controller is in. In each mode its
+  report descriptors are byte-identical to the cable's: dongle Switch ==
+  cable Switch, dongle DS4 == cable DS4, and dongle XInput if1 == cable
+  XInput if1. Channel A only exists while no controller is linked. Only the
+  product strings differ: "Pro Controller" on the dongle against "Gamepad" on
+  the cable in Switch mode. bcdDevice stays the dongle's 1.20 throughout.
+- **Serial number.** Only the XInput identities have a serial string. The
+  dongle in XInput mode reports the **same** serial as the controller over
+  the cable, so the serial identifies the controller (or the pair), not the
+  transport. The value is kept in git-ignored `private/`.
+- **LEDs.** Holding M shows the mode colour: XInput green, Switch red, DS4
+  blue, the same on cable and dongle. While linked to the dongle the Home LED
+  is solid white.
+- **For the CLI and udev rule:** configuration targets are 3537:1053 (cable)
+  and 3537:100b (dongle), both XInput, HID interface 1. 3537:0575 is the idle
+  dongle.
 
 **Firmware versions.** bcdDevice is the firmware version: 3.46 = controller
 V3.4.6, 1.20 = dongle V1.2.0. GameSir's FAQ quotes versions in this form
@@ -32,7 +53,7 @@ bundled images are named `GS_C2_ADC_DEVICE_V346`/`V352` and
 `GS_C2_Dongle_V119`/`V121` (§5). Confidence **medium**. It follows that
 GameSir Connect has newer images than both devices are running.
 
-**Mode switching (wired, firmware V3.4.6), observed 2026-10-26.** Holding
+**Mode switching (firmware V3.4.6, cable and dongle), observed 2026-10-26.** Holding
 View + Menu cycles XInput → Switch → DS4 → XInput, and each step
 re-enumerates the device. Home + X switched XInput → DS4 (blue). Home + Y
 flashed the LED but changed nothing; Home + A did nothing. This differs from
@@ -41,7 +62,7 @@ GameSir's online manual. Power-on came up in XInput. Confidence **confirmed**
 
 ### 1.2 3537:0575 (dongle): single HID interface
 
-Evidence: `recon/dongle-ctrl-off/descriptors.txt`, `recon/dongle-ctrl-off/rdesc-if00.txt`.
+Evidence: `recon/dongle-idle-1/descriptors.txt`, `recon/dongle-idle-1/rdesc-if00.txt`.
 Confidence: **confirmed** (read from the descriptors the kernel cached).
 
 - Full speed, one configuration, bus-powered, 500 mA.
@@ -103,8 +124,9 @@ keystrokes and mouse input.
   until GameSir Connect's code maps the commands (step 3).
 
 ### 1.5 Open questions
-- Does the dongle's descriptor change once a controller links to it, or
-  does it always present only vendor channels? To check in step 1.4.
+- Does the dongle relay configuration to the controller over the air, or
+  does it hold some settings itself? To answer from code (step 3) and captures
+  (step 4).
 
 ## 2. Commands
 
