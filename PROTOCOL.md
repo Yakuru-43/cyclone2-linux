@@ -347,6 +347,14 @@ Animation layout (124 bytes):
 - `+3` **brightness** (0–100);
 - `+4 + 15f + 3z`: frame *f* (0–7), zone *z* (0–4), as R, G, B.
 
+**Confirmed by capture 01** (`captures/01-rgb-brightness.jsonl`): changing
+brightness 0 → 50 → 0 in GSC sent `0F 03 20 01 78 01 32`, then
+`0F 03 20 01 78 01 00`. Each got the reply `10 06 00` (Ack). 0x178 =
+1 + 124·3 + 3, the brightness of animation 3, which is the active effect
+(byte 0 = 3). On the Lighting page, GSC also sends `0F 0D 01 01` (light
+preview, no reply). With the byte at 50 the LEDs lit, and they matched
+GSC's on-screen colours.
+
 So animation 0, frame 0, zone 0 is at 0x005. That matches InFract
 (0x0001 / 0x0003 / 0x0004 / 0x0005; animation 2 at 0x007D). **high**
 

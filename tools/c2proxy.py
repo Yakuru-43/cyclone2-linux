@@ -14,6 +14,8 @@ or dropped packet is logged to captures/<session>.jsonl.
 
 Usage: python3 -I tools/c2proxy.py SESSION [--stream]
 Needs read/write access to /dev/uhid (see README).
+To start a new capture file without restarting:
+  echo NAME > captures/.rotate
 """
 
 import argparse
@@ -31,6 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 GAMESIR_VID = 0x3537
 CONFIG_PIDS = {0x1053: "cable", 0x100B: "dongle"}
 REPORT_LEN = 64  # report ID + 63 bytes, on every vendor report
+ROTATE = ROOT / "captures" / ".rotate"
 
 # linux/uhid.h
 UHID_DESTROY, UHID_START, UHID_STOP, UHID_OPEN, UHID_CLOSE, UHID_OUTPUT = 1, 2, 3, 4, 5, 6
@@ -105,9 +108,16 @@ def find_real_device():
 class Log:
     def __init__(self, path, stream):
         self.f = open(path, "a", buffering=1)
+        self.path = path
         self.stream = stream
         self.t0 = time.monotonic()
         self.skipped_stream = 0
+
+    def rotate(self, path):
+        self.f.close()
+        self.f = open(path, "a", buffering=1)
+        self.path = path
+        self.t0 = time.monotonic()
 
     def write(self, direction, pkt, note=None):
         if pkt[:1] == b"\x12" and not self.stream:
@@ -174,6 +184,11 @@ def main():
     relayed = blocked = 0
     try:
         while not stop:
+            if ROTATE.exists():
+                name = ROTATE.read_text().strip()
+                ROTATE.unlink()
+                log.rotate(ROOT / "captures" / f"{name}.jsonl")
+                print(f"log: {log.path.relative_to(ROOT)}", flush=True)
             if not announced:
                 new = {p.name for p in Path("/sys/class/hidraw").iterdir()} - before
                 if new:
