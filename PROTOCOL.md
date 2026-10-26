@@ -325,6 +325,28 @@ The 7-byte key block, then macro data:
 - So the **left-stick deadzone** is at 0x229 / 0x22A, and the **right-stick
   deadzone** at 0x249 / 0x24A.
 
+**Confirmed by capture 03** (`captures/03-left-stick-deadzone.jsonl`):
+moving the left-stick deadzone slider sent writes at bank 1 +0x229, covering
+14 bytes: dz_front, then the curve fields through p4. dz_front went 10 → 22
+→ … → 10, and with each tick GSC recalculated the curve points from the new
+deadzone (`S()`, §4.9 of the code notes). Every slider tick is a separate
+write.
+
+**GSC re-encodes the whole profile on the first edit after loading.** In
+capture 03, before the first slider value, GSC wrote bank 1 from 0x041 to
+0x2A1 (12 chunks). Compared with the factory bytes
+(`backups/2026-10-26-baseline.json`):
+- turbo_speed 10 → 0 on keys with turbo off;
+- hair_status 1 → 0 (off either way);
+- curve_en 0 → 1, with default linear points around the deadzone, on both
+  sticks, both triggers and both motion blocks;
+- stick map_en 0 → 1, with identity output (LS → 1, RS → 2), axis_ratio and
+  mouse_dpi 50.
+
+The visible settings are unchanged. **Rule for our tool:** write only the
+bytes of the field being changed, never re-encode a whole bank, and keep the
+factory backup for an exact restore.
+
 ### 4.8 Motion block (33 bytes)
 `activate behaviour, quick key, active axis` (bit 0 / bit 1), followed by the
 same deadzone, curve and map sub-blocks as a stick.
