@@ -12,9 +12,10 @@ import time
 
 from . import protocol as P
 from .device import CONFIG_PIDS, Cyclone2, DeviceError, find
-from .layout import (HAIR_TRIGGER_MODES, LIGHT_BANK, LIGHT_ZONES, PROFILE_BANKS, STICKS,
-                     TRIGGERS, decode_light, decode_profile, hair_trigger, light_brightness,
-                     light_color, stick_deadzone, trigger_deadzone)
+from .keycodes import KEY_CODES, KEY_NAMES
+from .layout import (HAIR_TRIGGER_MODES, KEYS, LIGHT_BANK, LIGHT_ZONES, PROFILE_BANKS,
+                     STICKS, TRIGGERS, decode_light, decode_profile, hair_trigger, key_map,
+                     light_brightness, light_color, stick_deadzone, trigger_deadzone)
 
 ALL_BANKS = (*PROFILE_BANKS, LIGHT_BANK)
 
@@ -23,8 +24,11 @@ APPROVED_WRITES = [light_brightness(e) for e in range(5)] + [
     light_color(e, f, z) for e in range(5) for f in range(8) for z in range(5)] + [
     stick_deadzone(b, s) for b in PROFILE_BANKS for s in STICKS] + [
     trigger_deadzone(b, t) for b in PROFILE_BANKS for t in TRIGGERS] + [
-    hair_trigger(b, t) for b in PROFILE_BANKS for t in TRIGGERS]
+    hair_trigger(b, t) for b in PROFILE_BANKS for t in TRIGGERS] + [
+    key_map(b, k) for b in PROFILE_BANKS for k in KEYS]
 LIGHT_SETTINGS = ("brightness", "color")
+# Remap targets: gamepad buttons and stick directions (keyboard/mouse later).
+MAP_TARGETS = {name: code for name, code in KEY_CODES.items() if 0x01 <= code <= 0x1C}
 
 
 def policy(pkt):
@@ -164,6 +168,11 @@ def profile_plan(args, bank):
         f = (stick_deadzone if target in STICKS else trigger_deadzone)(bank, target)
         data = bytes([inner] if outer is None else [inner, outer])
         return f, (f.offset - 1, 3), data  # enable, inner, outer
+    if args.setting == "map":
+        key, target = args.value
+        f = key_map(bank, key)
+        data = b"\0\0" if target == key else bytes([1, MAP_TARGETS[target]])
+        return f, (f.offset, 2), data
     target, mode = args.value
     f = hair_trigger(bank, target)
     return f, (f.offset, 1), bytes([HAIR_TRIGGER_MODES[mode]])
@@ -182,6 +191,11 @@ def cmd_set_profile_setting(dev, args):
         if not data[0] < outer:
             raise DeviceError(f"the inner deadzone must be below the outer one ({outer})")
         change = f"{old_inner}-{old_outer} -> {data[0]}-{outer}"
+    elif args.setting == "map":
+        key = args.value[0]
+        def output(en, code):
+            return KEY_NAMES.get(code, f"0x{code:02x}") if en else key
+        change = f"{key} outputs {output(*old)} -> {output(*data)}"
     else:
         names = {v: k for k, v in HAIR_TRIGGER_MODES.items()}
         change = f"{names.get(old[0], f'raw 0x{old[0]:02x}')} -> {names[data[0]]}"
@@ -222,6 +236,16 @@ def hair_trigger_value(text):
         raise argparse.ArgumentTypeError(
             f"use lt|rt={'|'.join(HAIR_TRIGGER_MODES)} (fixed mode is not confirmed yet)")
     return trigger, mode
+
+
+def map_value(text):
+    """'A=B' -> ('A', 'B'). 'A=A' resets A to itself."""
+    key, _, target = text.partition("=")
+    if key not in KEYS:
+        raise argparse.ArgumentTypeError(f"button must be one of {', '.join(KEYS)}")
+    if target != key and target not in MAP_TARGETS:
+        raise argparse.ArgumentTypeError(f"target must be one of {', '.join(MAP_TARGETS)}")
+    return key, target
 
 
 def profile_bank(text):
@@ -296,12 +320,14 @@ def main(argv=None):
     b = sub.add_parser("backup", help="save every bank to a new JSON file")
     b.add_argument("file")
     st = sub.add_parser("set", help="change one setting (writes to the controller)")
-    st.add_argument("setting", choices=["brightness", "color", "deadzone", "hair-trigger"])
+    st.add_argument("setting", choices=["brightness", "color", "deadzone", "hair-trigger",
+                                        "map"])
     st.add_argument("value", help="brightness: 0-100\ncolor: ZONE=#RRGGBB, ZONE in "
                     + ", ".join(LIGHT_ZONES) + "\ndeadzone: left|right|lt|rt=INNER[:OUTER]"
-                    "\nhair-trigger: lt|rt=" + "|".join(HAIR_TRIGGER_MODES))
+                    "\nhair-trigger: lt|rt=" + "|".join(HAIR_TRIGGER_MODES)
+                    + "\nmap: BUTTON=TARGET (BUTTON=BUTTON resets it)")
     st.add_argument("--profile", type=profile_bank, metavar="1-4|shift",
-                    help="profile for deadzone / hair-trigger (default: the active one)")
+                    help="profile for deadzone / hair-trigger / map (default: the active one)")
     st.add_argument("--frame", type=lambda t: int(t) - 1, default=0, metavar="1-8",
                     help="animation frame for color (default: 1)")
     st.add_argument("--effect", type=lambda t: int(t) - 1, metavar="1-5",
@@ -315,7 +341,8 @@ def main(argv=None):
         try:
             args.value = {"brightness": percent, "color": zone_color,
                           "deadzone": deadzone_value,
-                          "hair-trigger": hair_trigger_value}[args.setting](args.value)
+                          "hair-trigger": hair_trigger_value,
+                          "map": map_value}[args.setting](args.value)
         except (argparse.ArgumentTypeError, ValueError) as e:
             ap.error(f"set {args.setting}: {e}")
 

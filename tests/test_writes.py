@@ -112,7 +112,9 @@ class Deadzone(unittest.TestCase):
     def run_set(self, value, profile=None, setting="deadzone"):
         from argparse import Namespace
         from cyclone2.cli import cmd_set, deadzone_value, hair_trigger_value, planned_packets
-        parse = deadzone_value if setting == "deadzone" else hair_trigger_value
+        from cyclone2.cli import map_value
+        parse = {"deadzone": deadzone_value, "hair-trigger": hair_trigger_value,
+                 "map": map_value}[setting]
         args = Namespace(cmd="set", setting=setting, value=parse(value), profile=profile)
         dev = FakeDevice(self.banks)
         cmd_set(dev, None, None, args)
@@ -154,3 +156,18 @@ class Triggers(Deadzone):
     def test_unconfirmed_hair_values_refused(self):
         for v in (0x82, 0x01, 0x80, 0xFF):
             self.assertIsNotNone(policy(P.write_chunk(1, 0x1FA, [v])), hex(v))
+
+
+class Remap(Deadzone):
+    def test_matches_capture_06(self):
+        dev, planned = self.run_set("A=B", setting="map")
+        self.assertEqual(dev.sent, planned)
+        self.assertEqual(dev.sent[2][:8].hex(" "), "0f 03 01 00 7a 02 01 0a")
+        dev, planned = self.run_set("A=A", setting="map")
+        self.assertEqual(dev.sent[2][:8].hex(" "), "0f 03 01 00 7a 02 00 00")
+        for pkt in dev.sent:
+            self.assertIsNone(policy(pkt))
+
+    def test_keyboard_targets_refused_for_now(self):
+        self.assertIsNotNone(policy(P.write_chunk(1, 0x07A, [1, 0x32])))   # KB_ESC
+        self.assertIsNotNone(policy(P.write_chunk(1, 0x079, [1, 0x0A, 0])))  # spills into turbo

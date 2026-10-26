@@ -137,3 +137,11 @@ def hair_trigger(bank, trigger):
         raise ValueError("bank must be 1-5")
     return Field(f"profile{bank}.{trigger}.hair_trigger", bank, TRIGGERS[trigger] + 12, 1,
                  0, 0xFF, frozenset(HAIR_TRIGGER_MODES.values()))
+
+
+def key_map(bank, key):
+    """A key block's (map_en, map_value1): what the button outputs (0x040 + 7i + 2)."""
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.key.{key}.map", bank, 0x040 + 7 * KEYS.index(key) + 2,
+                 2, 0, 0x1C)
