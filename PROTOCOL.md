@@ -293,9 +293,19 @@ TRI = Y, PS = Home, Sel = View, Sta = Menu, Camera = Share, FL1/FR1 = L4/R4.
 
 ### 4.4 Key block (7 bytes)
 `turbo_en, turbo_speed, map_en, map_value1, map_value2, map_value3, toggle_en`.
-`map_value*` are key codes from GSC's table `Xa` (`getKeyMapValue` /
-`getButtonKey`, **not yet extracted**: needed for remapping). Turbo:
-`turbo_en = speed > 0`.
+`map_value*` are key codes from GSC's table (`wa`/`xa`, main.js
+l. 13971–14265), now in `cyclone2/keycodes.py` (144 entries):
+- gamepad buttons 0x01–0x14, in key-block order: Up 01, Down 02, Left 03,
+  Right 04, LB 05, RB 06, LS 07, RS 08, A 09, **B 0A**, X 0B, Y 0C, Home 0D,
+  View 0E, Menu 0F, Share 10, L4 11, R4 12, LT 13, RT 14;
+- stick directions 0x15–0x1C; keyboard keys from 0x32 (106 entries);
+- mouse 0xC8–0xCE; Mute 0xE6, Shift 0xE7, none 0xFF.
+
+Turbo: `turbo_en = speed > 0`.
+
+**Confirmed by capture 06** (`captures/06-remap-a-to-b.jsonl`): mapping A → B
+wrote `0F 03 01 00 7A 02 01 0A` (A's block + 2: map_en = 1, map1 = 0x0A).
+Mapping A back to itself wrote `… 02 00 00`. "Self" means map_en = 0.
 
 ### 4.5 Back-button block (159 bytes)
 The 7-byte key block, then macro data:
