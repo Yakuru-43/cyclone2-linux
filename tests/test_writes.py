@@ -19,7 +19,7 @@ class Writes(unittest.TestCase):
                     P.write_chunk(0x20, 0x178, [1, 1]),       # spills past the field
                     P.write_chunk(1, 0x2E, [2]),              # report rate, not approved
                     P.write_chunk(1, 0x39E, [1] * 6),         # device ID
-                    P.packet(0x17, 0x55, 0x88), P.packet(0xFC), P.packet(0x07, 1)]:
+                    P.packet(0x17, 0x55, 0x88), P.packet(0xFC), P.packet(0x07, 5)]:
             self.assertIsNotNone(policy(pkt), pkt[:7].hex(" "))
 
     def test_reads_still_allowed(self):
