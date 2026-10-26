@@ -201,3 +201,65 @@ class Vibration(Deadzone):
         for v in (1, 26, 99, 101, 255):
             self.assertIsNotNone(policy(P.write_chunk(1, 0x020, [v])), v)
         self.assertIsNotNone(policy(P.write_chunk(1, 0x022, [75])))   # trigger motors: no
+
+
+class FlakyLink(unittest.TestCase):
+    """Cyclone2.write/switch_profile over a link that drops replies."""
+
+    def make(self, drop_acks):
+        from cyclone2.device import Cyclone2, DeviceError
+
+        class Dev(Cyclone2):
+            def __init__(self):  # no hardware
+                self.banks = {1: bytearray(680)}
+                self.profile = 1
+                self.sent = []
+                self.drops = drop_acks
+
+            def transact(self, pkt, expect, timeout=1.0, match=None):
+                self.sent.append(pkt)
+                if pkt[1] == P.OP_WRITE:
+                    bank, off, n = pkt[2], pkt[3] << 8 | pkt[4], pkt[5]
+                    if self.drops and self.drops.pop(0) == "lost-command":
+                        raise DeviceError("no reply")
+                    self.banks[bank][off:off + n] = pkt[6:6 + n]
+                    if self.drops and self.drops.pop(0) == "lost-ack":
+                        raise DeviceError("no reply")
+                    return bytes([0x10, 0x06, 0])
+                if pkt[1] == P.OP_READ:
+                    bank, off, n = pkt[2], pkt[3] << 8 | pkt[4], pkt[5]
+                    return bytes([0x10, 0x05, bank, pkt[3], pkt[4], n]) + bytes(self.banks[bank][off:off + n])
+                if pkt[1] == P.OP_SWITCH_PROFILE:
+                    if self.drops and self.drops.pop(0) == "lost-command":
+                        raise DeviceError("no reply")
+                    self.profile = pkt[2]
+                    return bytes([0x10, 0x06, 0])
+                if pkt[1] == P.OP_CURRENT_PROFILE:
+                    return bytes([0x10, 0x0C, self.profile])
+        return Dev()
+
+    def writes(self, dev):
+        return [p for p in dev.sent if p[1] == P.OP_WRITE]
+
+    def test_lost_ack_is_not_resent(self):
+        dev = self.make(["ok", "lost-ack"])
+        dev.write(1, 0x20, b"\x64\x64")
+        self.assertEqual(len(self.writes(dev)), 1)
+
+    def test_lost_command_is_resent_once(self):
+        dev = self.make(["lost-command", "ok", "ok"])
+        dev.write(1, 0x20, b"\x64\x64")
+        self.assertEqual(len(self.writes(dev)), 2)
+        self.assertEqual(bytes(dev.banks[1][0x20:0x22]), b"\x64\x64")
+
+    def test_gives_up_after_one_resend(self):
+        from cyclone2.device import DeviceError
+        dev = self.make(["lost-command", "lost-command"])
+        with self.assertRaises(DeviceError):
+            dev.write(1, 0x20, b"\x64\x64")
+        self.assertEqual(len(self.writes(dev)), 2)
+
+    def test_switch_profile_resends_once(self):
+        dev = self.make(["lost-command"])
+        dev.switch_profile(2)
+        self.assertEqual(dev.profile, 2)

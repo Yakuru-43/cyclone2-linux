@@ -228,11 +228,8 @@ def cmd_set_profile_setting(dev, args):
 
 def cmd_profile(dev, path, pid, args):
     old = dev.current_profile()
-    dev.transact(P.switch_profile(args.number), {P.OP_ACK})
-    now = dev.current_profile()
-    if now != args.number:
-        raise DeviceError(f"asked for profile {args.number}, controller reports {now}")
-    print(f"active profile: {old} -> {now}")
+    dev.switch_profile(args.number)
+    print(f"active profile: {old} -> {args.number}")
 
 
 def cmd_rumble(path, args):
