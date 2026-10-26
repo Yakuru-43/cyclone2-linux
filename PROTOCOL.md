@@ -294,7 +294,7 @@ TRI = Y, PS = Home, Sel = View, Sta = Menu, Camera = Share, FL1/FR1 = L4/R4.
 ### 4.3 Fun_Data (0x020–0x03F)
 | Offset | Field | Values |
 |---|---|---|
-| 0x020 / 0x021 / 0x022 / 0x023 | motor left / right / LT / RT (GSC v1.14.5 has **no UI** for these on the Cyclone 2; to confirm with our own write in step 6) | raw 0, 25, 50, 75, 100 = UI levels 0–4 (`D()`/`L()`, l. 8605). Default UI level 3 (raw 75). |
+| 0x020 / 0x021 / 0x022 / 0x023 | motor left / right / LT / RT (GSC v1.14.5 has **no UI** for these on the Cyclone 2). **0x020/0x021 confirmed by feel** (`captures/26-…`): with them at 0, a standard XInput rumble (xpad force feedback, 100 %, 1 s) produced nothing. At 75 (level 3) it was strong. The owner then chose level 4 (100) for profile 1. | raw 0, 25, 50, 75, 100 = UI levels 0–4 (`D()`/`L()`, l. 8605). Default UI level 3 (raw 75). |
 | 0x024–0x028 | audio: enable, volume, mixer, mic mute, mic sensitivity | |
 | 0x029 / 0x02A | shift enable / shift value | |
 | 0x02B | D-pad diagonal lock | bit 0 |
@@ -462,11 +462,11 @@ order in report 0x12 (Home, LowerLeft, …) is a different list.
 ### 4.10 Target settings → where they live
 | Setting | Location | Confidence |
 |---|---|---|
-| RGB colour / brightness / speed | bank 0x20: active effect + animation fields | high (two sources) |
-| Vibration strength | bank *n*, 0x020–0x023 | high |
-| Stick deadzones | bank *n*, 0x229–0x22C (L) / 0x249–0x24C (R) | high (GSC only) |
-| Trigger deadzones | 0x1F0–0x1F4 (LT) / 0x20C–0x210 (RT); hair trigger at +12–14 | high (GSC only) |
-| Button remapping | key blocks 0x040–0x0AF, back buttons 0x0B0/0x14F; needs the `Xa` code table | medium |
+| RGB colour / brightness / speed | bank 0x20: active effect + animation fields | brightness and colour **confirmed** (CLI writes, visible); speed high |
+| Vibration strength | bank *n*, 0x020 (left) / 0x021 (right) | **confirmed** by feel |
+| Stick deadzones | bank *n*, 0x229–0x22C (L) / 0x249–0x24C (R) | **confirmed** by feel |
+| Trigger deadzones | 0x1F0–0x1F4 (LT) / 0x20C–0x210 (RT); hair trigger at +12–14 | **confirmed** by feel (LT); RT by symmetry, high |
+| Button remapping | key blocks 0x040–0x0AF (+2 map_en, +3 code; `cyclone2/keycodes.py`); back buttons 0x0B0/0x14F | **confirmed** by feel (main buttons); back buttons medium |
 | Profiles | read: `0B` / bank 0x30; switch: `07 n` | **confirmed** (CLI `profile N`; per-profile settings verified by feel; the controller shows no LED indication on a switch) |
 
 ## 5. Firmware-update paths (must never be triggered)
