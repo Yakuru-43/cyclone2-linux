@@ -10,3 +10,6 @@ private/
 .venv/
 __pycache__/
 *.pyc
+
+# Third-party source we read but do not vendor
+third_party/

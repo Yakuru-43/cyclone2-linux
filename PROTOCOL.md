@@ -115,8 +115,11 @@ keystrokes and mouse input.
 - Vendor channel **B** (0xFFF0: 0x0F out, 0x10/0x12 in) is present on the
   controller in XInput mode and on the dongle. It is absent in Switch and DS4
   modes. GameSir's FAQ says to use GameSir Connect "via dongle or Cable in
-  Xinput mode". *Guess* (medium): B is the GameSir Connect configuration
-  channel.
+  Xinput mode". InFract's driver opens exactly this collection (VID 0x3537,
+  PID 0x1053 or 0x100b, usage page 0xFFF0) and its notes say GSC configures
+  the device through it (§2). Confidence **high** that B is the configuration
+  channel: two independent sources agree. It becomes confirmed when we see
+  a reply on the device.
 - Vendor channel **A** (0xFF32: 0x41 in/out) appears only on the dongle.
   *Guess:* it belongs to the dongle itself (pairing, its own settings or its
   own update).
@@ -128,9 +131,106 @@ keystrokes and mouse input.
   does it hold some settings itself? To answer from code (step 3) and captures
   (step 4).
 
-## 2. Commands
+## 2. Commands (vendor channel B)
 
-(none yet)
+**Source for this section:** InFract, MIT, by Nicole Rivers
+(github.com/NaokoAF/InFract, commit 6d54c5d, 2026-07-01). Files:
+`Drivers/GameSir/Cyclone2Notes.md`, `Drivers/GameSir/Cyclone2Driver.cs`, and
+`Gamepads/GameSir/Cyclone2/*.cs`. This is third-party reverse engineering
+that we have **not yet** checked against GameSir Connect's code (step 3) or
+captures (step 4). Everything here is **medium** unless marked otherwise.
+InFract's own author flags parts of it as uncertain.
+
+### 2.1 Framing
+- Host → device: output report **0x0F**. Byte 0 after the report ID is the
+  command, followed by its arguments, padded to 63 bytes (64 on the wire).
+  InFract writes Heartbeat as just 2 bytes (`0F F2`) and Rumble as a full,
+  zero-padded 64-byte report.
+- Device → host: input report **0x10**, carrying replies. Byte 0 after the ID
+  is the reply code.
+- Device → host: input report **0x12**, an input-state stream. It only flows
+  while heartbeats keep arriving (§2.3).
+- No checksum or CRC appears in InFract's packets. (Step 3 checks whether GSC
+  adds one.)
+
+### 2.2 Command table
+
+"Kind" says what a command does to the device: **read** (no state change),
+**volatile** (changes run-time state only, gone on power-off), or **write**
+(changes stored settings or the active profile).
+
+| Dir | Code | Name | Arguments / payload | Reply | Kind |
+|---|---|---|---|---|---|
+| out | 0xF2 | Heartbeat | none | 0x12 stream starts | volatile |
+| out | 0x09 | Firmware info | none | 0x0A | read |
+| in | 0x0A | Firmware info reply | 16 bytes "unicode": first 8 = controller version, last 8 = dongle version | | |
+| out | 0x0B | Get profile | none | 0x0C | read |
+| in | 0x0C | Get profile reply | `XX` = current profile (1–4) | | |
+| out | 0x04 | Read register | `bank, addr_hi, addr_lo, len` (len ≤ 58) | 0x05 | read |
+| in | 0x05 | Read register reply | `bank, addr_hi, addr_lo, len, data…` | | |
+| out | 0x10 | Read register (alt) | same as 0x04 | 0x11 | read. *Guess (InFract):* reads live memory rather than flash. GSC uses it after 0x0F. |
+| in | 0x11 | Read register (alt) reply | header + data | | |
+| out | 0x03 | Write register | `bank, addr_hi, addr_lo, len, data…` | 0x06 | **write** |
+| out | 0x07 | Set profile | `XX` (1–4) | 0x06 | **write** |
+| in | 0x06 | Ack | none (reply to 0x03 and 0x07) | | |
+| out | 0x06 | "Registers loaded" (?) | none; GSC sends it at startup after reading all registers | ? | **unknown**, treat as write |
+| out | 0x0D | Select RGB keyframe | `01 XX` | ? | **unknown**, treat as write |
+| out | 0x20 | Rumble | `66 55 L R` (`66 55` unexplained) | none | volatile |
+| in | 0x0F | Register changed | `bank, addr_hi, addr_lo, len_hi?, len_lo`, no data; sent when the user changes a setting with the M button | | |
+
+Notes:
+- **Heartbeat.** GSC sends it once a second, InFract every 500 ms. On the
+  dongle the 0x12 stream is limited to 200 Hz.
+- **What InFract actually sends:** only Heartbeat and Rumble, never a
+  register write. Those two are proven harmless only to the extent that
+  InFract users run them.
+
+### 2.3 Input stream (report 0x12), 63 bytes
+
+Uses the DS4 layout, plus "raw" values (before remapping and deadzones) in
+bytes 53–61. Offsets exclude the report ID.
+
+| Offset | Field |
+|---|---|
+| 0–3 | LX, LY, RX, RY (u8) |
+| 4–5 | buttons: bits 0–3 D-pad (0=N, clockwise to 7=NW, other = released), 4 X, 5 A, 6 B, 7 Y, 8 LB, 9 RB, 10 LT, 11 RT, 12 View, 13 Menu, 14 LS, 15 RS |
+| 6 | special: bit 0 Home, 1 Share, 3 L4, 4 R4, 5 M. L4, R4 and M only show in the raw copy (byte 59). |
+| 7–8 | LT, RT (u8) |
+| 9–10 | timestamp, u16 LE, units of 5.33 µs |
+| 12–23 | gyro X/Y/Z (±2000 °/s), accel X/Y/Z (±4 g), i16 LE |
+| 34–41 | touchpad slots (DS4 format) |
+| 53–61 | raw LX, LY, RX, RY, raw buttons (57–58), raw special (59), raw LT, RT |
+
+### 2.4 Registers
+
+Address = (bank, 16-bit big-endian address). Values from InFract's
+`Cyclone2Registry.cs`.
+
+| Bank | Address | Meaning | Values |
+|---|---|---|---|
+| 1–4 (per profile) | 0x0020 | left rumble strength | 0–100 |
+| 1–4 | 0x0021 | right rumble strength | 0–100 |
+| 1–4 | 0x002E | polling rate | 0 = 250 Hz, 1 = 500 Hz, 2 = 1000 Hz |
+| 0x20 (RGB) | 0x0000 | active RGB profile | ? |
+| 0x20 | 0x0001 | RGB profile 1: keyframe count | 1–8 |
+| 0x20 | 0x0003 | RGB 1: speed | 0–20 (higher = slower) |
+| 0x20 | 0x0004 | RGB 1: brightness | 0–100 |
+| 0x20 | 0x0005 / 0x0008 / 0x000B / 0x000E / 0x0011 | RGB 1 colours: left / right / unknown / Home / dots | 3 bytes each (*guess:* R, G, B) |
+| 0x20 | 0x007D / 0x00F9 / 0x0175 | RGB profiles 2 / 3 / 4: keyframe count | so each RGB profile is 0x7C (124) bytes apart |
+| 0x30 | 0x0000 | selected profile | 1–4 |
+
+### 2.5 Send policy for our tool
+
+The CLI talks only to vendor channel B, on 3537:1053 or 3537:100b, and checks
+every outgoing command against an **allow-list**. There is no deny-list:
+anything not listed is refused.
+- Allowed from step 5 on, once the owner approves the first packet: 0x09,
+  0x0B, 0x04 (reads), and 0xF2 (volatile, needed for the input stream).
+- Allowed only after per-command approval in step 6: 0x03, 0x07, and whatever
+  step 3 finds RGB needs.
+- Never: any code that step 3 links to firmware update, bootloader or DFU,
+  whatever its name. Nothing ever goes on the idle dongle (3537:0575) or its
+  channel A.
 
 ## 3. Checksums / CRC
 
