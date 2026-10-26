@@ -3,6 +3,7 @@
 import time
 from pathlib import Path
 
+from . import hidraw
 from . import protocol as P
 
 GAMESIR_VID = 0x3537
@@ -20,31 +21,19 @@ class DeviceError(Exception):
     pass
 
 
-def _is_virtual(path):
-    node = Path(path).name
-    return "/virtual/" in str((Path("/sys/class/hidraw") / node / "device").resolve())
-
-
 def find():
     """[(path, pid)] for real Cyclone 2 config channels (never the proxy's)."""
-    import hidraw
-    found = []
-    for d in hidraw.enumerate(GAMESIR_VID):
-        path = d["path"].decode() if isinstance(d["path"], bytes) else d["path"]
-        if (d["product_id"] in CONFIG_PIDS and d["usage_page"] == CONFIG_USAGE_PAGE
-                and not _is_virtual(path)):
-            found.append((path, d["product_id"]))
-    return sorted(set(found))
+    return [(d["path"], d["pid"]) for d in hidraw.devices()
+            if d["vid"] == GAMESIR_VID and d["pid"] in CONFIG_PIDS
+            and CONFIG_USAGE_PAGE in d["usage_pages"] and not d["virtual"]]
 
 
 class Cyclone2:
     def __init__(self, path, policy=P.check_read_only, log=None):
-        import hidraw
         self.path = path
         self.policy = policy
         self.log = log
-        self.dev = hidraw.device()
-        self.dev.open_path(path.encode())
+        self.dev = hidraw.Device(path)
         self.last_send = self.last_reply = 0.0
 
     def close(self):

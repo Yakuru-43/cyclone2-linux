@@ -9,8 +9,8 @@ description = "Configure the GameSir Cyclone 2 controller from Linux"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
-# cython-hidapi; cyclone2 uses its hidraw backend (`import hidraw`)
-dependencies = ["hidapi>=0.14"]
+# Standard library only: hidraw is accessed directly.
+dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/Yakuru-43/cyclone2-linux"
