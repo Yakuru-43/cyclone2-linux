@@ -6,6 +6,7 @@ read when the device enumerated. This script never opens a hidraw node and
 never sends anything to the device.
 
 Usage: python3 -I tools/recon.py LABEL [--dev 1-10]
+       python3 -I tools/recon.py PREFIX --watch SECONDS
 Writes recon/LABEL/. Serial numbers go to recon/LABEL/private/ (git-ignored).
 """
 
@@ -14,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 USB = Path("/sys/bus/usb/devices")
@@ -82,10 +84,12 @@ def hid_decode(rdesc_path):
     return out.stdout + out.stderr
 
 
-def kernel_log(dev_name, hid_ids):
+def kernel_log(dev_name, hid_ids, since=None):
+    cmd = ["journalctl", "-k", "-b", "--no-pager", "-o", "short-iso"]
+    if since:
+        cmd.append(f"--since=@{int(since)}")
     try:
-        out = subprocess.run(["journalctl", "-k", "-b", "--no-pager", "-o",
-                              "short-iso"], capture_output=True, text=True)
+        out = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError:
         return ["(journalctl not available)"]
     keys = [f"usb {dev_name}:", f"usb {dev_name} "] + hid_ids
@@ -99,7 +103,7 @@ def redact(text, secrets):
     return text
 
 
-def recon(dev, out):
+def recon(dev, out, since=None):
     out.mkdir(parents=True, exist_ok=True)
     summary = [f"# Recon: {out.name}", "",
                f"sysfs: {dev.resolve()}", ""]
@@ -158,20 +162,63 @@ def recon(dev, out):
             summary.append(f"  report descriptor: {len(rdesc)} bytes -> "
                            f"rdesc-{tag}.bin / rdesc-{tag}.txt")
 
-    log = kernel_log(dev.name, hid_ids)
+    log = kernel_log(dev.name, hid_ids, since)
     (out / "kernel.log").write_text(redact("\n".join(log), secrets) + "\n")
     text = redact("\n".join(summary), secrets) + "\n"
     (out / "summary.txt").write_text(text)
     return text
 
 
+def usb_devices():
+    """Map 'name:devnum' -> path; devnum changes on every enumeration."""
+    devs = {}
+    for dev in USB.iterdir():
+        if ":" not in dev.name and (dev / "idVendor").exists():
+            devs[f"{dev.name}:{read(dev / 'devnum')}"] = dev
+    return devs
+
+
+def watch(prefix, seconds):
+    """Record every USB device that enumerates, until the timeout."""
+    known = usb_devices()
+    print(f"watching for {seconds}s; {len(known)} devices already present",
+          flush=True)
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        current = usb_devices()
+        for key in sorted(current.keys() - known.keys()):
+            started = time.time()
+            time.sleep(2)  # let drivers bind and hidraw nodes appear
+            dev = current[key]
+            try:
+                ident = f"{read(dev / 'idVendor')}-{read(dev / 'idProduct')}"
+                label = f"{prefix}-{time.strftime('%H%M%S')}-{ident}"
+                recon(dev, ROOT / "recon" / label, since=started - 5)
+                print(f"recorded {label}: {read(dev / 'product')!r} "
+                      f"on {dev.name}", flush=True)
+            except OSError as e:
+                print(f"{key} vanished before it could be recorded ({e})",
+                      flush=True)
+        for key in sorted(known.keys() - current.keys()):
+            print(f"removed {key}", flush=True)
+        known = current
+        time.sleep(0.5)
+    print("watch finished", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawTextHelpFormatter)
-    ap.add_argument("label", help="e.g. usb-xinput, dongle-xinput")
+    ap.add_argument("label", help="e.g. usb-xinput, dongle-xinput; with "
+                                  "--watch, a prefix for each recording")
     ap.add_argument("--dev", help="sysfs USB device name, e.g. 1-10")
+    ap.add_argument("--watch", type=int, metavar="SECONDS",
+                    help="record every device that enumerates for SECONDS")
     args = ap.parse_args()
 
+    if args.watch:
+        watch(args.label, args.watch)
+        return 0
     if args.dev:
         devs = [USB / args.dev]
     else:

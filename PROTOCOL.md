@@ -15,14 +15,17 @@ evidence behind each claim.
 
 | Connection | Mode | VID:PID | bcdDevice | Interfaces | Evidence | Confidence |
 |---|---|---|---|---|---|---|
-| unknown (cable or dongle, TBD) | unknown | 3537:0575 | 1.20 | 1 × HID (03/00/00) | `recon/as-found/` | IDs confirmed; connection and mode unknown |
+| 2.4 GHz dongle, controller off | (none linked) | 3537:0575 | 1.20 | 1 × HID (03/00/00) | `recon/dongle-ctrl-off/` | **confirmed**: the device disappeared when only the dongle was unplugged |
+| USB cable, controller off | n/a | (does not enumerate) | | | kernel log 2026-10-26 19:24 | **confirmed** |
 
 VID 0x3537 is "Guangzhou Chicken Run Network Technology Co., Ltd." (GameSir).
 The kernel reports `SerialNumber=0` (no serial string) for 3537:0575.
+*Guess:* bcdDevice 1.20 is the dongle firmware version. GameSir Connect
+bundles dongle images V119 and V121 (§5).
 
-### 1.2 3537:0575: single HID interface
+### 1.2 3537:0575 (dongle): single HID interface
 
-Evidence: `recon/as-found/descriptors.txt`, `recon/as-found/rdesc-if00.txt`.
+Evidence: `recon/dongle-ctrl-off/descriptors.txt`, `recon/dongle-ctrl-off/rdesc-if00.txt`.
 Confidence: **confirmed** (read from the descriptors the kernel cached).
 
 - Full speed, one configuration, bus-powered, 500 mA.
@@ -52,10 +55,8 @@ endpoint size.
 - Which vendor channel (A: 0x41, or B: 0x0F/0x10/0x12) carries configuration,
   and which carries firmware update? **Unknown.** Nothing is to be sent on
   either until GameSir Connect's code maps them (step 3).
-- What is plugged in at `as-found`: the cable or the dongle? In which mode?
-- Where does gamepad input go in this mode, given there is no gamepad
-  collection? *Guess:* this is not a gamepad mode, for example a dongle with
-  no controller linked, or a charge/config-only state.
+- Does the dongle's descriptor change once a controller links to it, or
+  does it always present only vendor channels? To check in step 1.4.
 
 ## 2. Commands
 
