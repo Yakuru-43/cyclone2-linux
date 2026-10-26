@@ -109,11 +109,11 @@ class Deadzone(unittest.TestCase):
         self.banks = load_backup(Path(__file__).resolve().parent.parent
                                  / "backups/2026-10-26-cli.json")
 
-    def run_set(self, value, profile=None):
+    def run_set(self, value, profile=None, setting="deadzone"):
         from argparse import Namespace
-        from cyclone2.cli import cmd_set, planned_packets, stick_deadzone_value
-        args = Namespace(cmd="set", setting="deadzone", value=stick_deadzone_value(value),
-                         profile=profile)
+        from cyclone2.cli import cmd_set, deadzone_value, hair_trigger_value, planned_packets
+        parse = deadzone_value if setting == "deadzone" else hair_trigger_value
+        args = Namespace(cmd="set", setting=setting, value=parse(value), profile=profile)
         dev = FakeDevice(self.banks)
         cmd_set(dev, None, None, args)
         planned = planned_packets(Namespace(**{**vars(args), "profile": profile or 1}))
@@ -134,3 +134,23 @@ class Deadzone(unittest.TestCase):
         from cyclone2.device import DeviceError
         with self.assertRaises(DeviceError):
             self.run_set("left=100")
+
+
+class Triggers(Deadzone):
+    def test_trigger_dry_runs_equal_sent(self):
+        for setting, value in (("deadzone", "lt=50"), ("deadzone", "rt=10:90"),
+                               ("hair-trigger", "lt=adaptive"), ("hair-trigger", "rt=off")):
+            dev, planned = self.run_set(value, setting=setting)
+            self.assertEqual(dev.sent, planned, value)
+            for pkt in dev.sent:
+                self.assertIsNone(policy(pkt), pkt[:8].hex(" "))
+
+    def test_matches_gsc_captures(self):
+        dev, _ = self.run_set("lt=15")                                  # capture 04
+        self.assertEqual(dev.sent[2][:7].hex(" "), "0f 03 01 01 f1 01 0f")
+        dev, _ = self.run_set("lt=adaptive", setting="hair-trigger")    # capture 05
+        self.assertEqual(dev.sent[2][:7].hex(" "), "0f 03 01 01 fa 01 81")
+
+    def test_unconfirmed_hair_values_refused(self):
+        for v in (0x82, 0x01, 0x80, 0xFF):
+            self.assertIsNotNone(policy(P.write_chunk(1, 0x1FA, [v])), hex(v))

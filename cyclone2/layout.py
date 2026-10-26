@@ -11,8 +11,9 @@ KEYS = ("Up", "Down", "Left", "Right", "LB", "RB", "LS", "RS",
 REPORT_RATES = {0: "250 Hz", 1: "500 Hz", 2: "1000 Hz"}
 MOTOR_LEVELS = {0: 0, 25: 1, 50: 2, 75: 3, 100: 4}
 
-# A writable field: name, bank, offset, length and the allowed value range.
-Field = namedtuple("Field", "name bank offset length lo hi")
+# A writable field: name, bank, offset, length, the allowed value range, and
+# optionally an explicit set of allowed values.
+Field = namedtuple("Field", "name bank offset length lo hi values", defaults=(None,))
 
 LT, RT = 0x1EE, 0x20A
 LEFT_STICK, RIGHT_STICK = 0x226, 0x246
@@ -116,3 +117,23 @@ def stick_deadzone(bank, stick):
     if bank not in PROFILE_BANKS:
         raise ValueError("bank must be 1-5")
     return Field(f"profile{bank}.{stick}_stick.deadzone", bank, STICKS[stick] + 3, 2, 0, 100)
+
+
+TRIGGERS = {"lt": LT, "rt": RT}
+# Hair-trigger status values confirmed on the device (capture 05). Fixed mode
+# (presumably 0x82) stays out until it is confirmed.
+HAIR_TRIGGER_MODES = {"off": 0x00, "adaptive": 0x81}
+
+
+def trigger_deadzone(bank, trigger):
+    """Inner and outer deadzone of LT or RT in one profile bank, in percent."""
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.{trigger}.deadzone", bank, TRIGGERS[trigger] + 3, 2, 0, 100)
+
+
+def hair_trigger(bank, trigger):
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.{trigger}.hair_trigger", bank, TRIGGERS[trigger] + 12, 1,
+                 0, 0xFF, frozenset(HAIR_TRIGGER_MODES.values()))

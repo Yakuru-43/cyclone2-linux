@@ -12,15 +12,18 @@ import time
 
 from . import protocol as P
 from .device import CONFIG_PIDS, Cyclone2, DeviceError, find
-from .layout import (LIGHT_BANK, LIGHT_ZONES, PROFILE_BANKS, STICKS, decode_light,
-                     decode_profile, light_brightness, light_color, stick_deadzone)
+from .layout import (HAIR_TRIGGER_MODES, LIGHT_BANK, LIGHT_ZONES, PROFILE_BANKS, STICKS,
+                     TRIGGERS, decode_light, decode_profile, hair_trigger, light_brightness,
+                     light_color, stick_deadzone, trigger_deadzone)
 
 ALL_BANKS = (*PROFILE_BANKS, LIGHT_BANK)
 
 # Field kinds the owner has approved for writing, one kind at a time (step 6).
 APPROVED_WRITES = [light_brightness(e) for e in range(5)] + [
     light_color(e, f, z) for e in range(5) for f in range(8) for z in range(5)] + [
-    stick_deadzone(b, s) for b in PROFILE_BANKS for s in STICKS]
+    stick_deadzone(b, s) for b in PROFILE_BANKS for s in STICKS] + [
+    trigger_deadzone(b, t) for b in PROFILE_BANKS for t in TRIGGERS] + [
+    hair_trigger(b, t) for b in PROFILE_BANKS for t in TRIGGERS]
 LIGHT_SETTINGS = ("brightness", "color")
 
 
@@ -55,11 +58,9 @@ def planned_packets(args):
                 P.write_chunk(f.bank, f.offset, value),
                 P.read_chunk(f.bank, f.offset, f.length)]  # read-back
     if args.cmd == "set":
-        stick, inner, outer = args.value
-        f = stick_deadzone(args.profile, stick)
-        data = bytes([inner] if outer is None else [inner, outer])
+        f, (pre_off, pre_len), data = profile_plan(args, args.profile)
         return [P.current_profile(),
-                P.read_chunk(f.bank, f.offset - 1, 3),   # enable, inner, outer
+                P.read_chunk(f.bank, pre_off, pre_len),  # current value (and enable byte)
                 P.write_chunk(f.bank, f.offset, data),
                 P.read_chunk(f.bank, f.offset, len(data))]
     if args.cmd == "info":
@@ -156,26 +157,42 @@ def show(field, data):
     return "#" + data.hex() if field.length == 3 else str(data[0])
 
 
-def cmd_set_deadzone(dev, args):
-    stick, inner, outer = args.value
+def profile_plan(args, bank):
+    """(field, (pre-read offset, length), data) for a per-profile setting."""
+    if args.setting == "deadzone":
+        target, inner, outer = args.value
+        f = (stick_deadzone if target in STICKS else trigger_deadzone)(bank, target)
+        data = bytes([inner] if outer is None else [inner, outer])
+        return f, (f.offset - 1, 3), data  # enable, inner, outer
+    target, mode = args.value
+    f = hair_trigger(bank, target)
+    return f, (f.offset, 1), bytes([HAIR_TRIGGER_MODES[mode]])
+
+
+def cmd_set_profile_setting(dev, args):
     current = dev.current_profile()
     bank = current if args.profile is None else args.profile
-    f = stick_deadzone(bank, stick)
-    enabled, old_inner, old_outer = dev.read(f.bank, f.offset - 1, 3)
-    if not enabled:
-        raise DeviceError(f"{f.name} is disabled in this profile; not writing")
-    if not inner < (old_outer if outer is None else outer):
-        raise DeviceError("the inner deadzone must be below the outer one "
-                          f"(currently {old_outer})")
-    data = bytes([inner] if outer is None else [inner, outer])
+    f, (pre_off, pre_len), data = profile_plan(args, bank)
+    old = dev.read(f.bank, pre_off, pre_len)
+    if args.setting == "deadzone":
+        enabled, old_inner, old_outer = old
+        if not enabled:
+            raise DeviceError(f"{f.name} is disabled in this profile; not writing")
+        outer = old_outer if len(data) == 1 else data[1]
+        if not data[0] < outer:
+            raise DeviceError(f"the inner deadzone must be below the outer one ({outer})")
+        change = f"{old_inner}-{old_outer} -> {data[0]}-{outer}"
+    else:
+        names = {v: k for k, v in HAIR_TRIGGER_MODES.items()}
+        change = f"{names.get(old[0], f'raw 0x{old[0]:02x}')} -> {names[data[0]]}"
     dev.write(f.bank, f.offset, data)
-    print(f"{f.name}: {old_inner}-{old_outer} -> {inner}-{old_outer if outer is None else outer}"
-          f" (written and read back){'' if bank == current else ' (not the active profile)'}")
+    print(f"{f.name}: {change} (written and read back)"
+          f"{'' if bank == current else ' (not the active profile)'}")
 
 
 def cmd_set(dev, path, pid, args):
-    if args.setting == "deadzone":
-        return cmd_set_deadzone(dev, args)
+    if args.setting not in LIGHT_SETTINGS:
+        return cmd_set_profile_setting(dev, args)
     active = dev.read(LIGHT_BANK, 0, 1)[0]
     effect = active if args.effect is None else args.effect
     f, value = set_target(args, effect)
@@ -185,17 +202,26 @@ def cmd_set(dev, path, pid, args):
           f"{'' if effect == active else ' (not the active effect)'}")
 
 
-def stick_deadzone_value(text):
-    """'left=15' or 'left=15:95' -> ('left', 15, 95 or None)."""
+def deadzone_value(text):
+    """'left=15' or 'lt=5:95' -> ('left', 15, 95 or None)."""
     stick, _, rng = text.partition("=")
-    if stick not in STICKS:
-        raise argparse.ArgumentTypeError("stick must be left or right")
+    if stick not in STICKS and stick not in TRIGGERS:
+        raise argparse.ArgumentTypeError("target must be left, right, lt or rt")
     inner, _, outer = rng.partition(":")
     inner = percent(inner)
     outer = percent(outer) if outer else None
     if outer is not None and not inner < outer:
         raise argparse.ArgumentTypeError("inner must be below outer")
     return stick, inner, outer
+
+
+def hair_trigger_value(text):
+    """'lt=adaptive' -> ('lt', 'adaptive')."""
+    trigger, _, mode = text.partition("=")
+    if trigger not in TRIGGERS or mode not in HAIR_TRIGGER_MODES:
+        raise argparse.ArgumentTypeError(
+            f"use lt|rt={'|'.join(HAIR_TRIGGER_MODES)} (fixed mode is not confirmed yet)")
+    return trigger, mode
 
 
 def profile_bank(text):
@@ -270,11 +296,12 @@ def main(argv=None):
     b = sub.add_parser("backup", help="save every bank to a new JSON file")
     b.add_argument("file")
     st = sub.add_parser("set", help="change one setting (writes to the controller)")
-    st.add_argument("setting", choices=["brightness", "color", "deadzone"])
-    st.add_argument("value", help="brightness: 0-100; color: ZONE=#RRGGBB with ZONE in "
-                    + ", ".join(LIGHT_ZONES) + "; deadzone: left|right=INNER[:OUTER]")
+    st.add_argument("setting", choices=["brightness", "color", "deadzone", "hair-trigger"])
+    st.add_argument("value", help="brightness: 0-100\ncolor: ZONE=#RRGGBB, ZONE in "
+                    + ", ".join(LIGHT_ZONES) + "\ndeadzone: left|right|lt|rt=INNER[:OUTER]"
+                    "\nhair-trigger: lt|rt=" + "|".join(HAIR_TRIGGER_MODES))
     st.add_argument("--profile", type=profile_bank, metavar="1-4|shift",
-                    help="profile for deadzone (default: the active one)")
+                    help="profile for deadzone / hair-trigger (default: the active one)")
     st.add_argument("--frame", type=lambda t: int(t) - 1, default=0, metavar="1-8",
                     help="animation frame for color (default: 1)")
     st.add_argument("--effect", type=lambda t: int(t) - 1, metavar="1-5",
@@ -287,7 +314,8 @@ def main(argv=None):
     if args.cmd == "set":
         try:
             args.value = {"brightness": percent, "color": zone_color,
-                          "deadzone": stick_deadzone_value}[args.setting](args.value)
+                          "deadzone": deadzone_value,
+                          "hair-trigger": hair_trigger_value}[args.setting](args.value)
         except (argparse.ArgumentTypeError, ValueError) as e:
             ap.error(f"set {args.setting}: {e}")
 
@@ -296,7 +324,7 @@ def main(argv=None):
     if args.dry_run and args.cmd == "set":
         if args.setting in LIGHT_SETTINGS and args.effect is None:
             ap.error("--dry-run needs --effect (the active one is read from the device)")
-        if args.setting == "deadzone" and args.profile is None:
+        if args.setting not in LIGHT_SETTINGS and args.profile is None:
             ap.error("--dry-run needs --profile (the active one is read from the device)")
     if args.dry_run:
         show_dry_run(args)

@@ -78,6 +78,10 @@ def check_write(pkt, fields):
         return "non-zero padding after the data"
     for f in fields:
         if f.bank == bank and f.offset <= off and off + n <= f.offset + f.length:
+            if f.values is not None:
+                if all(v in f.values for v in data):
+                    return None
+                return f"value not allowed for {f.name} ({sorted(f.values)})"
             if all(f.lo <= v <= f.hi for v in data):
                 return None
             return f"value out of range for {f.name} ({f.lo}-{f.hi})"
