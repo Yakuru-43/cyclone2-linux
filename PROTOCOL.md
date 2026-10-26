@@ -189,6 +189,17 @@ Kinds: **read** = no state change; **volatile** = run-time state only;
 | 0x03 → 0x039E | getSetDeviceIdCommand | `03 bank 03 9E 06` + 6 ASCII bytes | Overwrites the device ID. |
 | 0x08, 0x12, 0x14, 0xF0 | (decoder names only) | | WriteProfileToEEPRom, WriteEEPRom, ReadEEPRom, Download. No builder exists in GSC. |
 
+**Confirmed with our own CLI** (2026-10-26, `captures/10-cli-info.jsonl`,
+`captures/11-cli-backup.jsonl`):
+- `0F 09` → `10 0A 30 00 33 00 34 00 36 00 …` (V3.4.6);
+- `0F 0B` → `10 0C 01`;
+- 71 × `0F 04 …` → 71 matching `10 05 …`.
+
+**No heartbeat is needed** before commands. Replaying every captured GSC
+write on the factory baseline reproduced the device's state with zero
+unexplained bytes. So writes land exactly at (bank, offset), and the proxy
+captured every write.
+
 ### 2.3 Device → host replies (byte 1 of report 0x10)
 
 Decoder `wo`, l. 15277:
