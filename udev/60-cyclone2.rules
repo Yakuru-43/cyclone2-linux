@@ -1,0 +1,9 @@
+# GameSir Cyclone 2: give the logged-in user access to the controller's
+# configuration channel (hidraw), on the cable (3537:1053) and through the
+# 2.4 GHz dongle (3537:100b), both in XInput mode.
+#
+# Not needed on Bazzite, which already opens every hidraw node to all users.
+# Install: sudo cp 60-cyclone2.rules /etc/udev/rules.d/
+#          sudo udevadm control --reload && sudo udevadm trigger
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3537", ATTRS{idProduct}=="1053", TAG+="uaccess"
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3537", ATTRS{idProduct}=="100b", TAG+="uaccess"

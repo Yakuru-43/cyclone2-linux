@@ -14,3 +14,8 @@ __pycache__/
 # Third-party source we read but do not vendor
 third_party/
 captures/.rotate
+
+# Python packaging
+build/
+dist/
+*.egg-info/

@@ -1,7 +1,8 @@
-"""cyclone2: configure a GameSir Cyclone 2 from Linux.
+"""cyclone2: configure a GameSir Cyclone 2 from Linux (XInput mode, cable or dongle).
 
-Every packet goes through protocol.check_read_only, or for writes through
-protocol.check_write with the fields in APPROVED_WRITES.
+Every packet is checked against an allow-list before it is sent: reads, and
+writes to the specific settings `set` and `profile` support. Firmware update,
+calibration and anything unknown are always refused.
 """
 
 import argparse
@@ -351,6 +352,7 @@ def percent(text):
 
 
 def main(argv=None):
+    """Entry point for the `cyclone2` command."""
     ap = argparse.ArgumentParser(prog="cyclone2", description=__doc__,
                                  formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--device", help="hidraw path (default: autodetect)")
