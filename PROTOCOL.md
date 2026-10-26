@@ -358,9 +358,18 @@ GSC's on-screen colours.
 So animation 0, frame 0, zone 0 is at 0x005. That matches InFract
 (0x0001 / 0x0003 / 0x0004 / 0x0005; animation 2 at 0x007D). **high**
 
-Zone order is **unresolved**. GSC names the live-state zones Home,
-LowerLeft, LowerRight, UpperLeft, UpperRight; InFract labels the frame zones
-left, right, unknown, Home, dots. To settle with a capture.
+Zone order (data zone *z* in each frame):
+
+| z | Physical LED | GSC label | Evidence | Confidence |
+|---|---|---|---|---|
+| 0 | left grip | zone 1 | owner saw the stored colour `#0040FF` (blue) on the left grip | high |
+| 1 | right grip | zone 3 | **capture 02**: changing GSC zone 3 wrote 0x17C–0x17E (animation 3, frame 0, zone 1) | **confirmed** |
+| 2 | ? (nothing visible) | — | GSC shows only 4 zones | — |
+| 3 | Home | zone 2 | InFract's label only | *guess* |
+| 4 | dot above M | zone 4 | owner saw the stored `#FF0500` (red) there | high |
+
+This matches InFract's labels (left, right, ?, Home, dots). GSC's live-state
+order in report 0x12 (Home, LowerLeft, …) is a different list.
 
 ### 4.10 Target settings → where they live
 | Setting | Location | Confidence |
