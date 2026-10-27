@@ -70,6 +70,18 @@ select { background: var(--card); border: 1px solid var(--line); border-radius: 
 .item { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .item code { display: block; font: 12px var(--mono); color: var(--muted); margin-top: 3px;
              word-break: break-all; }
+.battery { display: inline-flex; align-items: center; gap: 8px; font-size: 13px;
+           border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px 3px 10px; }
+.batt-icon { position: relative; width: 26px; height: 13px; border: 2px solid currentColor;
+             border-radius: 3px; opacity: .85; }
+.batt-icon::after { content: ""; position: absolute; right: -5px; top: 2px; width: 3px; height: 5px;
+                    background: currentColor; border-radius: 0 2px 2px 0; }
+.batt-fill { position: absolute; left: 1px; top: 1px; bottom: 1px; border-radius: 1px;
+             background: var(--ok); }
+.battery.low .batt-fill { background: var(--bad); }
+.battery.low { color: var(--bad); border-color: var(--bad); }
+.battery.charging { border-color: var(--ok); }
+.batt-text b { font-variant-numeric: tabular-nums; }
 .toast { position: fixed; right: 20px; bottom: 76px; background: var(--text); color: var(--bg);
          padding: 10px 14px; border-radius: 10px; opacity: 0; transition: opacity .2s;
          pointer-events: none; max-width: 420px; z-index: 6; }
@@ -83,7 +95,10 @@ select { background: var(--card); border: 1px solid var(--line); border-radius: 
 <header>
   <h1>Cyclone 2</h1>
   <span class="chip" id="status">connecting…</span>
-  <span class="chip" id="battery" hidden></span>
+  <span class="battery" id="battery" hidden title="Controller battery">
+    <span class="batt-icon"><span class="batt-fill" id="batt-fill"></span></span>
+    <span class="batt-text" id="batt-text"></span>
+  </span>
   <span class="spacer"></span>
   <button id="rumble" title="1-second test rumble at full strength">Test rumble</button>
   <button id="backup">Back up…</button>
@@ -266,16 +281,30 @@ function render() {
 }
 
 function showBattery(b) {
-  const chip = $("battery");
-  chip.hidden = !b;
+  const box = $("battery");
+  box.hidden = !b;
   if (!b) return;
-  chip.textContent = `${b.charging ? "Charging" : "Battery"} ${b.percent}%`;
-  chip.style.color = !b.charging && b.percent <= 15 ? "var(--bad)" : "";
-  chip.title = b.charging ? "Charging over USB" : "Battery level reported by the controller";
+  const pct = Math.max(0, Math.min(100, b.percent));
+  const low = !b.charging && pct <= 15;
+  $("batt-fill").style.width = `calc(${pct}% - 2px)`;
+  $("batt-text").replaceChildren(el("b", {}, `${pct}%`),
+    b.charging ? " · ⚡ Charging" : low ? " · Low battery" : "");
+  box.classList.toggle("low", low);
+  box.classList.toggle("charging", b.charging);
+  box.title = b.charging ? "Plugged in over USB: charging"
+                         : "Battery level reported by the controller";
 }
 async function refreshBattery() {
-  if (!state || document.hidden || $("overlay").classList.contains("show")) return;
-  try { showBattery((await api("/api/battery")).battery); } catch { /* shown on next reload */ }
+  if (document.hidden || $("overlay").classList.contains("show")) return;
+  if (!state) return load(editing);              // try to reconnect
+  try {
+    const r = await api("/api/battery");
+    if (r.connection !== state.device.connection && !count(edits)) return load(state.profile);
+    showBattery(r.battery);
+  } catch {
+    showBattery(null);
+    $("status").textContent = "controller not found";
+  }
 }
 
 // ---- actions -------------------------------------------------------------
@@ -358,7 +387,8 @@ $("rumble").onclick = () => busy(async () => { await api("/api/rumble"); toast("
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePlan(); });
 window.addEventListener("beforeunload", (e) => { if (count(edits)) e.preventDefault(); });
 setInterval(() => api("/api/ping").catch(() => {}), 3000);
-setInterval(refreshBattery, 30000);
+setInterval(refreshBattery, 10000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshBattery(); });
 load();
 </script>
 </body>

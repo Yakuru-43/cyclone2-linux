@@ -408,7 +408,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             elif route == "/api/apply":
                 result = {"applied": s.apply(str(body.get("id", "")))}
             elif route == "/api/battery":
-                result = s.run(lambda d, pid: {"battery": battery(d)})
+                result = s.run(lambda d, pid: {"battery": battery(d),
+                                               "connection": CONFIG_PIDS[pid]})
             elif route == "/api/backup":
                 result = s.run(backup)
             elif route == "/api/rumble":
