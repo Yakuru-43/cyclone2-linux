@@ -230,16 +230,19 @@ def cmd_set_back(dev, args):
     was, macro = decode_back(block, key, KEY_NAMES)
     code = BACK_SELF[key] if target == key else MAP_TARGETS[target]
     writes = back_map_writes(bank, key, block, code)
+    def name(t):
+        return "nothing" if t == key else t
     before = (f"macro ({', '.join(s['key'] for s in macro)})" if macro
-              else was or "custom")
+              else name(was) if was else "custom")
+    target_name = name(target)
     where = f"profile {bank}{'' if bank == current else ' (not the active profile)'}"
     if not writes:
-        print(f"{key} on {where} already outputs {target}")
+        print(f"{key} on {where} already outputs {target_name}")
         return
-    print(f"{key} on {where}: {before} -> {target}. Writes:")
+    print(f"{key} on {where}: {before} -> {target_name}. Writes:")
     for label, off, old, new in writes:
         print(f"  {P.write_chunk(bank, off, new)[:6 + len(new)].hex(' ')} + zeros   "
-              f"{label.replace('mapping', target)}")
+              f"{label.replace('mapping', target_name)}")
     if args.plan:
         print("(plan only: nothing written)")
         return
@@ -295,8 +298,11 @@ def vibration_value(text):
 
 
 def map_value(text):
-    """'A=B' -> ('A', 'B'). 'A=A' resets A to itself. L4/R4 too."""
+    """'A=B' -> ('A', 'B'). 'A=A' resets A to itself. L4/R4 too, where
+    'L4=nothing' (or 'none', or 'L4=L4') means no output."""
     key, _, target = text.partition("=")
+    if key in BACK_KEYS and target.lower() in ("nothing", "none"):
+        target = key
     if key not in KEYS and key not in BACK_KEYS:
         raise argparse.ArgumentTypeError(
             f"button must be one of {', '.join((*KEYS, *BACK_KEYS))}")
@@ -383,7 +389,7 @@ def main(argv=None):
     st.add_argument("value", help="brightness: 0-100\ncolor: ZONE=#RRGGBB, ZONE in "
                     + ", ".join(LIGHT_ZONES) + "\ndeadzone: left|right|lt|rt=INNER[:OUTER]"
                     "\nhair-trigger: lt|rt=" + "|".join(HAIR_TRIGGER_MODES)
-                    + "\nmap: BUTTON=TARGET (BUTTON=BUTTON resets it)"
+                    + "\nmap: BUTTON=TARGET (BUTTON=BUTTON resets it; L4/R4=nothing)"
                     + "\nvibration: LEVEL | left=LEVEL | right=LEVEL (0-4)")
     st.add_argument("--plan", action="store_true",
                     help="map L4/R4: read the controller, print the writes, write nothing")

@@ -199,8 +199,9 @@ def plan_settings(dev, pid, req):
                 continue
             base = BACK_KEYS[key]
             code = BACK_SELF[key] if target == key else MAP_TARGETS[target]
+            name = "nothing" if target == key else target
             for label, off, old, new in back_map_writes(bank, key, p[base:base + BACK_BLOCK], code):
-                plan.write(label.replace("mapping", target), bank, off, old, new)
+                plan.write(label.replace("mapping", name), bank, off, old, new)
             continue
         if key not in KEYS:
             raise DeviceError(f"unknown button {key}")

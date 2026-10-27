@@ -29,7 +29,7 @@ XInput mode.
 | RGB brightness and colours | `set brightness`, `set color` | on device, visible |
 | Stick and trigger deadzones | `set deadzone` | on device, by feel |
 | Hair trigger (off / adaptive) | `set hair-trigger` | on device, by feel |
-| Button remapping (to gamepad buttons) | `set map` | on device, by feel |
+| Button remapping (to gamepad buttons), including L4/R4 | `set map` | on device, by feel |
 | Switch the active profile | `profile` | on device |
 | Vibration strength | `set vibration` | on device, by feel |
 
@@ -95,6 +95,8 @@ cyclone2 set deadzone left=12          # stick inner deadzone in %; left=12:95 s
 cyclone2 set deadzone lt=8             # trigger deadzone (lt, rt)
 cyclone2 set hair-trigger rt=adaptive  # off | adaptive
 cyclone2 set map A=B                   # A outputs B; `set map A=A` resets it
+cyclone2 set map L4=A                  # back buttons; `L4=nothing` = no output
+cyclone2 set map L4=A --plan           #   show the exact writes first (L4/R4 only)
 cyclone2 set vibration 4               # levels 0-4; left=N / right=N for one motor
 cyclone2 profile 2                     # switch the active profile (1-4)
 

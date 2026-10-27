@@ -164,3 +164,4 @@ class BackButtonPlans(unittest.TestCase):
         items = gui.plan_settings(FakeDev(), 0x1053, {"profile": 1, "map": {"L4": "L4"}}).items
         self.assertEqual([i["packet"][:17] for i in items],
                          ["0f 03 01 00 b7 01", "0f 03 01 00 ba 09"])
+        self.assertEqual(items[0]["label"], "L4: turn off its macro")

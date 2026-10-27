@@ -237,6 +237,7 @@ function render() {
   }
   vib.append(el("div", { class: "note" }, "Levels 0–4, as in GameSir Connect. 0 turns rumble off."));
 
+  const back = Object.keys(s.macro || {});   // L4, R4: "itself" sends nothing
   const keyRow = (k) => {
     const path = ["map", k];
     const sel = el("select");
@@ -244,19 +245,19 @@ function render() {
     if (macro) sel.append(el("option", { value: MACRO, disabled: true },
       `macro: ${macro.map((m) => m.key).join(", ")}`));
     else if (s.map[k] === null) sel.append(el("option", { value: "", disabled: true }, "(custom)"));
-    sel.append(el("option", { value: k }, `${k} (itself)`));
+    sel.append(el("option", { value: k }, back.includes(k) ? "Nothing" : `${k} (itself)`));
     for (const t of s.map_targets) if (t !== k) sel.append(el("option", { value: t }, KEY_LABEL[t] || t));
     sel.value = current(path) ?? "";
     sel.onchange = () => setEdit(path, sel.value);
     return el("div", { class: "row", "data-path": JSON.stringify(path) }, el("label", {}, k), sel);
   };
-  const back = Object.keys(s.macro || {});
   const keys = el("div", { class: "keys" }, ...Object.keys(s.map).filter((k) => !back.includes(k)).map(keyRow));
   const buttons = el("section", { class: "card" }, el("h2", {}, "Buttons"), keys);
   if (back.length) buttons.append(el("div", { class: "sub" }, "Back buttons"),
     el("div", { class: "keys" }, ...back.map(keyRow)),
-    el("div", { class: "note" }, "Picking a button for L4/R4 turns off any macro on it, as " +
-      "GameSir Connect does. Restore a backup to bring a macro back."));
+    el("div", { class: "note" }, "“Nothing”: the button sends no input to games. Picking a " +
+      "button turns off any macro on it, as GameSir Connect does; restore a backup to bring " +
+      "a macro back."));
 
   $("main").replaceChildren(light, sticks, triggers, vib, buttons);
   refreshPending();

@@ -321,6 +321,11 @@ class BackButtonsCli(Deadzone):
                                             profile=None, plan=plan))
         return dev
 
+    def test_nothing_alias(self):
+        from cyclone2.cli import map_value
+        self.assertEqual(map_value("L4=nothing"), ("L4", "L4"))
+        self.assertEqual(map_value("R4=none"), ("R4", "R4"))
+
     def test_plan_writes_nothing(self):
         dev = self.run_back("L4=B", plan=True)
         self.assertFalse([p for p in dev.sent if p[1] == P.OP_WRITE])

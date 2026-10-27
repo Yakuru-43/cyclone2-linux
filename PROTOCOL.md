@@ -343,6 +343,32 @@ The 7-byte key block, then macro data:
 - cycle time (BE16), then step count (≤ 30);
 - 30 steps of `key, hold BE16, delay BE16`. The last step has no delay.
 
+L4 is at 0x0B0 and R4 at 0x14F. Mapping uses +2 (map_en) and +3 (code), as
+in the main key blocks.
+
+- **"Itself" is encoded differently from the main buttons:** map_en = 1
+  plus the button's own code (L4 0x11, R4 0x12), in every bank of the
+  factory data.
+- **"Itself" sends nothing to games.** XInput has no L4/R4, and Steam's input
+  test registered nothing (2026-10-27).
+- **Factory macro.** Profile 1's L4 shipped with flags 0x01 and 2 steps: RB
+  (hold 420 ms, delay 1026 ms), then Home (hold 258 ms). GSC shows this as
+  `</>`. No other profile has a macro.
+- **Picking a button clears the macro.** GSC's renderer
+  (`select()`, renderer.js l. ~13883) empties `macro.steps` before setting
+  the mapping. The encoder then writes flags bit 0 = 0, step count 0 and
+  zeroed steps. Bits 1–2 and the cycle time are kept.
+- **Confirmed by our CLI and by feel** (`captures/41-…` to `43-…`):
+  - `set map R4=A` (`0F 03 01 01 51 02 01 09`) made R4 register as A.
+  - `set map L4=B` wrote `0F 03 01 00 B7 01 00` (macro off),
+    `0F 03 01 00 BA 09 00…` (step count and steps up to the last non-zero
+    byte) and `0F 03 01 00 B2 02 01 0A`. L4 then registered as B, with no
+    macro.
+  - `L4=L4` / `R4=R4` (`…B2 02 01 11`, `…51 02 01 12`) returned both to
+    "nothing".
+- The first macro-off write's Ack was lost over the dongle. The read-back
+  showed it had landed, so it was not resent.
+
 ### 4.6 Trigger block (28 bytes)
 | +0 | +1 | +2 | +3 | +4 | +5 | +6 | +7 | +8–10 | +11 | +12 | +13 | +14 | +15 | +16 | +17 | +18–27 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -481,7 +507,7 @@ order in report 0x12 (Home, LowerLeft, …) is a different list.
 | Vibration strength | bank *n*, 0x020 (left) / 0x021 (right) | **confirmed** by feel |
 | Stick deadzones | bank *n*, 0x229–0x22C (L) / 0x249–0x24C (R) | **confirmed** by feel |
 | Trigger deadzones | 0x1F0–0x1F4 (LT) / 0x20C–0x210 (RT); hair trigger at +12–14 | **confirmed** by feel (LT); RT by symmetry, high |
-| Button remapping | key blocks 0x040–0x0AF (+2 map_en, +3 code; `cyclone2/keycodes.py`); back buttons 0x0B0/0x14F | **confirmed** by feel (main buttons); back buttons medium |
+| Button remapping | key blocks 0x040–0x0AF (+2 map_en, +3 code; `cyclone2/keycodes.py`); back buttons 0x0B0/0x14F (same, plus macro clearing) | **confirmed** by feel (main and back buttons) |
 | Profiles | read: `0B` / bank 0x30; switch: `07 n` | **confirmed** (CLI `profile N`; per-profile settings verified by feel; the controller shows no LED indication on a switch) |
 
 ## 5. Firmware-update paths (must never be triggered)
