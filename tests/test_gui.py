@@ -145,3 +145,22 @@ class ServerSecurity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BackButtonPlans(unittest.TestCase):
+    def test_state_and_plan(self):
+        dev = FakeDev()
+        s = gui.read_state(dev, 0x1053)
+        self.assertEqual(s["map"]["L4"], "L4")
+        self.assertEqual([m["key"] for m in s["macro"]["L4"]], ["RB", "Home"])
+        self.assertEqual((s["map"]["R4"], s["macro"]["R4"]), ("R4", None))
+        items = gui.plan_settings(dev, 0x1053, {"profile": 1, "map": {"L4": "B", "R4": "R4"}}).items
+        self.assertEqual([i["packet"] for i in items],
+                         ["0f 03 01 00 b7 01 00", "0f 03 01 00 ba 09 " + "00 " * 8 + "00",
+                          "0f 03 01 00 b2 02 01 0a"])
+        self.assertEqual(items[2]["label"], "L4 → B")
+
+    def test_l4_itself_with_macro_still_clears_macro(self):
+        items = gui.plan_settings(FakeDev(), 0x1053, {"profile": 1, "map": {"L4": "L4"}}).items
+        self.assertEqual([i["packet"][:17] for i in items],
+                         ["0f 03 01 00 b7 01", "0f 03 01 00 ba 09"])

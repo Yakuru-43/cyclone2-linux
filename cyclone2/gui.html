@@ -117,6 +117,7 @@ const el = (tag, attrs = {}, ...kids) => {
   for (const k of kids) e.append(k);
   return e;
 };
+const MACRO = "__macro__";      // page-side marker: the button currently plays a macro
 const KEY_LABEL = { LSUp: "LS ↑", LSDown: "LS ↓", LSLeft: "LS ←", LSRight: "LS →",
                     RSUp: "RS ↑", RSDown: "RS ↓", RSLeft: "RS ←", RSRight: "RS →" };
 let state = null, edits = {}, plan = null, editing = null;
@@ -236,18 +237,26 @@ function render() {
   }
   vib.append(el("div", { class: "note" }, "Levels 0–4, as in GameSir Connect. 0 turns rumble off."));
 
-  const keys = el("div", { class: "keys" });
-  for (const k of Object.keys(s.map)) {
+  const keyRow = (k) => {
     const path = ["map", k];
     const sel = el("select");
-    if (s.map[k] === null) sel.append(el("option", { value: "", disabled: true, selected: true }, "(custom)"));
+    const macro = s.macro?.[k];
+    if (macro) sel.append(el("option", { value: MACRO, disabled: true },
+      `macro: ${macro.map((m) => m.key).join(", ")}`));
+    else if (s.map[k] === null) sel.append(el("option", { value: "", disabled: true }, "(custom)"));
     sel.append(el("option", { value: k }, `${k} (itself)`));
     for (const t of s.map_targets) if (t !== k) sel.append(el("option", { value: t }, KEY_LABEL[t] || t));
-    if (s.map[k] !== null) sel.value = current(path);
+    sel.value = current(path) ?? "";
     sel.onchange = () => setEdit(path, sel.value);
-    keys.append(el("div", { class: "row", "data-path": JSON.stringify(path) }, el("label", {}, k), sel));
-  }
+    return el("div", { class: "row", "data-path": JSON.stringify(path) }, el("label", {}, k), sel);
+  };
+  const back = Object.keys(s.macro || {});
+  const keys = el("div", { class: "keys" }, ...Object.keys(s.map).filter((k) => !back.includes(k)).map(keyRow));
   const buttons = el("section", { class: "card" }, el("h2", {}, "Buttons"), keys);
+  if (back.length) buttons.append(el("div", { class: "sub" }, "Back buttons"),
+    el("div", { class: "keys" }, ...back.map(keyRow)),
+    el("div", { class: "note" }, "Picking a button for L4/R4 turns off any macro on it, as " +
+      "GameSir Connect does. Restore a backup to bring a macro back."));
 
   $("main").replaceChildren(light, sticks, triggers, vib, buttons);
   refreshPending();
@@ -259,6 +268,7 @@ async function load(profile = editing) {
   await busy(async () => {
     try {
       state = await api("/api/state", profile ? { profile } : {});
+      for (const [k, m] of Object.entries(state.macro || {})) if (m) state.map[k] = MACRO;
     } catch (e) {
       $("main").replaceChildren(el("div", { class: "empty" }, e.message,
         el("br"), el("br"), el("button", { onclick: () => load(profile) }, "Retry")));

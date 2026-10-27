@@ -21,6 +21,14 @@ class DeviceError(Exception):
     pass
 
 
+def read_range(dev, bank, offset, length):
+    """Read any byte range, in protocol-sized chunks."""
+    out = bytearray()
+    for off in range(offset, offset + length, P.CHUNK):
+        out += dev.read(bank, off, min(P.CHUNK, offset + length - off))
+    return bytes(out)
+
+
 def find():
     """[(path, pid)] for real Cyclone 2 config channels (never the proxy's)."""
     return [(d["path"], d["pid"]) for d in hidraw.devices()

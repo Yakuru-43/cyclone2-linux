@@ -263,3 +263,73 @@ class FlakyLink(unittest.TestCase):
         dev = self.make(["lost-command"])
         dev.switch_profile(2)
         self.assertEqual(dev.profile, 2)
+
+
+class BackButtons(unittest.TestCase):
+    def setUp(self):
+        from pathlib import Path
+        from cyclone2.cli import load_backup
+        self.banks = load_backup(Path(__file__).resolve().parent.parent
+                                 / "backups/2026-10-26-dongle.json")
+
+    def writes(self, bank, key, target_code):
+        from cyclone2.layout import BACK_BLOCK, BACK_KEYS, back_map_writes
+        base = BACK_KEYS[key]
+        return back_map_writes(bank, key, self.banks[bank][base:base + BACK_BLOCK], target_code)
+
+    def test_l4_with_macro_clears_it_like_gsc(self):
+        w = self.writes(1, "L4", 0x0A)                    # L4 -> B, profile 1 has a macro
+        pkts = [P.write_chunk(1, off, new)[:6 + len(new)].hex(" ") for _, off, _, new in w]
+        self.assertEqual(pkts, ["0f 03 01 00 b7 01 00",                 # macro off
+                                "0f 03 01 00 ba 09 " + "00 " * 8 + "00",  # step count + steps
+                                "0f 03 01 00 b2 02 01 0a"])             # L4 -> B
+        for _, off, _, new in w:
+            self.assertIsNone(policy(P.write_chunk(1, off, new)))
+
+    def test_r4_without_macro_is_one_write(self):
+        w = self.writes(1, "R4", 0x0A)
+        self.assertEqual([(off, new) for _, off, _, new in w], [(0x151, b"\x01\x0a")])
+
+    def test_itself_is_the_factory_encoding(self):
+        self.assertEqual(self.writes(2, "R4", 0x12), [])          # already R4 -> R4
+        self.assertEqual(self.writes(2, "L4", 0x11), [])
+
+    def test_policy_never_creates_a_macro(self):
+        for pkt in (P.write_chunk(1, 0x0BB, [0x06]),          # a step key
+                    P.write_chunk(1, 0x0BA, [0x02]),          # a step count
+                    P.write_chunk(1, 0x0B7, [0x01]),          # macro on
+                    P.write_chunk(1, 0x0B8, [0x05]),          # cycle time
+                    P.write_chunk(1, 0x0B2, [0x01, 0x32])):   # keyboard target
+            self.assertIsNotNone(policy(pkt), pkt[:7].hex(" "))
+
+    def test_decode(self):
+        from cyclone2.keycodes import KEY_NAMES
+        from cyclone2.layout import BACK_BLOCK, decode_back
+        target, macro = decode_back(self.banks[1][0x0B0:0x0B0 + BACK_BLOCK], "L4", KEY_NAMES)
+        self.assertEqual(target, "L4")
+        self.assertEqual([m["key"] for m in macro], ["RB", "Home"])
+        self.assertEqual(decode_back(self.banks[1][0x14F:0x14F + BACK_BLOCK], "R4", KEY_NAMES),
+                         ("R4", None))
+
+
+class BackButtonsCli(Deadzone):
+    def run_back(self, value, plan):
+        from argparse import Namespace
+        from cyclone2.cli import cmd_set, map_value
+        dev = FakeDevice(self.banks)
+        cmd_set(dev, None, None, Namespace(cmd="set", setting="map", value=map_value(value),
+                                            profile=None, plan=plan))
+        return dev
+
+    def test_plan_writes_nothing(self):
+        dev = self.run_back("L4=B", plan=True)
+        self.assertFalse([p for p in dev.sent if p[1] == P.OP_WRITE])
+
+    def test_writes_and_macro_is_gone(self):
+        from cyclone2.keycodes import KEY_NAMES
+        from cyclone2.layout import decode_back
+        dev = self.run_back("L4=B", plan=False)
+        self.assertEqual(len([p for p in dev.sent if p[1] == P.OP_WRITE]), 3)
+        self.assertEqual(decode_back(dev.banks[1][0x0B0:0x0B0 + 159], "L4", KEY_NAMES), ("B", None))
+        for pkt in dev.sent:
+            self.assertIsNone(policy(pkt), pkt[:8].hex(" "))

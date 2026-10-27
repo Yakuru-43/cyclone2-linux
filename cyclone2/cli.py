@@ -12,10 +12,11 @@ import sys
 import time
 
 from . import protocol as P
-from .device import CONFIG_PIDS, Cyclone2, DeviceError, find
+from .device import CONFIG_PIDS, Cyclone2, DeviceError, find, read_range
 from .keycodes import KEY_CODES, KEY_NAMES
-from .layout import (HAIR_TRIGGER_MODES, KEYS, LIGHT_BANK, LIGHT_ZONES, MOTOR_RAW, MOTORS,
-                     PROFILE_BANKS, STICKS, TRIGGERS, decode_light, decode_profile,
+from .layout import (BACK_BLOCK, BACK_KEYS, BACK_SELF, HAIR_TRIGGER_MODES, KEYS,
+                     LIGHT_BANK, LIGHT_ZONES, MOTORS, MOTOR_RAW, PROFILE_BANKS, STICKS,
+                     TRIGGERS, back_map_writes, decode_back, decode_light, decode_profile,
                      hair_trigger, key_map, light_brightness, light_color, motors,
                      stick_deadzone, trigger_deadzone)
 from .rumble import find_event_node, rumble
@@ -218,7 +219,38 @@ def cmd_rumble(path, args):
     rumble(node, args.strong, args.weak, args.ms)
 
 
+def cmd_set_back(dev, args):
+    """set map L4=… / R4=…: clear the button's macro if it has one (as GameSir
+    Connect does when you pick a button), then set the mapping."""
+    key, target = args.value
+    current = dev.current_profile()
+    bank = current if args.profile is None else args.profile
+    base = BACK_KEYS[key]
+    block = read_range(dev, bank, base, BACK_BLOCK)
+    was, macro = decode_back(block, key, KEY_NAMES)
+    code = BACK_SELF[key] if target == key else MAP_TARGETS[target]
+    writes = back_map_writes(bank, key, block, code)
+    before = (f"macro ({', '.join(s['key'] for s in macro)})" if macro
+              else was or "custom")
+    where = f"profile {bank}{'' if bank == current else ' (not the active profile)'}"
+    if not writes:
+        print(f"{key} on {where} already outputs {target}")
+        return
+    print(f"{key} on {where}: {before} -> {target}. Writes:")
+    for label, off, old, new in writes:
+        print(f"  {P.write_chunk(bank, off, new)[:6 + len(new)].hex(' ')} + zeros   "
+              f"{label.replace('mapping', target)}")
+    if args.plan:
+        print("(plan only: nothing written)")
+        return
+    for label, off, old, new in writes:
+        dev.write(bank, off, new)
+    print("written and read back")
+
+
 def cmd_set(dev, path, pid, args):
+    if args.setting == "map" and args.value[0] in BACK_KEYS:
+        return cmd_set_back(dev, args)
     if args.setting not in LIGHT_SETTINGS:
         return cmd_set_profile_setting(dev, args)
     active = dev.read(LIGHT_BANK, 0, 1)[0]
@@ -263,10 +295,11 @@ def vibration_value(text):
 
 
 def map_value(text):
-    """'A=B' -> ('A', 'B'). 'A=A' resets A to itself."""
+    """'A=B' -> ('A', 'B'). 'A=A' resets A to itself. L4/R4 too."""
     key, _, target = text.partition("=")
-    if key not in KEYS:
-        raise argparse.ArgumentTypeError(f"button must be one of {', '.join(KEYS)}")
+    if key not in KEYS and key not in BACK_KEYS:
+        raise argparse.ArgumentTypeError(
+            f"button must be one of {', '.join((*KEYS, *BACK_KEYS))}")
     if target != key and target not in MAP_TARGETS:
         raise argparse.ArgumentTypeError(f"target must be one of {', '.join(MAP_TARGETS)}")
     return key, target
@@ -352,6 +385,8 @@ def main(argv=None):
                     "\nhair-trigger: lt|rt=" + "|".join(HAIR_TRIGGER_MODES)
                     + "\nmap: BUTTON=TARGET (BUTTON=BUTTON resets it)"
                     + "\nvibration: LEVEL | left=LEVEL | right=LEVEL (0-4)")
+    st.add_argument("--plan", action="store_true",
+                    help="map L4/R4: read the controller, print the writes, write nothing")
     st.add_argument("--profile", type=profile_bank, metavar="1-4|shift",
                     help="profile for deadzone / hair-trigger / map (default: the active one)")
     st.add_argument("--frame", type=lambda t: int(t) - 1, default=0, metavar="1-8",
@@ -384,6 +419,9 @@ def main(argv=None):
 
     if args.dry_run and args.cmd == "restore":
         ap.error("restore needs the controller's current state: use --plan instead")
+    if args.dry_run and args.cmd == "set" and args.setting == "map" \
+            and args.value[0] in BACK_KEYS:
+        ap.error("L4/R4 writes depend on the button's macro: use --plan instead of --dry-run")
     if args.dry_run and args.cmd == "set":
         if args.setting in LIGHT_SETTINGS and args.effect is None:
             ap.error("--dry-run needs --effect (the active one is read from the device)")

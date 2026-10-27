@@ -157,3 +157,69 @@ def motors(bank):
         raise ValueError("bank must be 1-5")
     return Field(f"profile{bank}.vibration", bank, 0x020, 2, 0, 100,
                  frozenset(MOTOR_RAW.values()))
+
+
+# Back buttons: 159-byte blocks (PROTOCOL.md §4.5): the 7-byte key header,
+# then macro flags (+7), cycle time (+8-9), step count (+10), 30 steps (+11).
+BACK_KEYS = {"L4": 0x0B0, "R4": 0x14F}
+BACK_BLOCK = 159
+# Factory "maps to itself" for back buttons: map_en 1 + the button's own code.
+BACK_SELF = {"L4": 0x11, "R4": 0x12}
+
+
+def back_map(bank, key):
+    """A back button's (map_en, map_value1)."""
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.{key}.map", bank, BACK_KEYS[key] + 2, 2, 0, 0x1C)
+
+
+def back_macro_flags(bank, key):
+    """Macro flags with the 'enabled' bit clear: writes can only turn a macro off."""
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.{key}.macro_flags", bank, BACK_KEYS[key] + 7, 1, 0, 0xFF,
+                 frozenset({0x00, 0x02, 0x04, 0x06}))
+
+
+def back_macro_steps(bank, key):
+    """Step count and steps: writes can only zero them (clear the macro)."""
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.{key}.macro_steps", bank, BACK_KEYS[key] + 10,
+                 BACK_BLOCK - 10, 0, 0, frozenset({0}))
+
+
+def decode_back(block, key, names):
+    """What a back button does: (target name, its own name, or None if
+    custom) and its macro steps (None if no macro)."""
+    en, code = block[2], block[3]
+    target = key if (not en or code == BACK_SELF[key]) else names.get(code)
+    macro = None
+    if block[7] & 1 and block[10]:
+        macro = [{"key": names.get(block[11 + 5 * i], f"0x{block[11 + 5 * i]:02x}"),
+                  "hold_ms": block[12 + 5 * i] << 8 | block[13 + 5 * i]}
+                 for i in range(min(block[10], 30))]
+    return target, macro
+
+
+def back_map_writes(bank, key, block, target_code):
+    """[(label, offset, old, new)] to map a back button the way GameSir
+    Connect does: picking a button clears the button's macro (flag off, step
+    count and steps zeroed), then the mapping is set. Only bytes that change
+    are written."""
+    base, writes = BACK_KEYS[key], []
+    if block[7] & 1:
+        writes.append((f"{key}: turn off its macro", base + 7, block[7:8],
+                       bytes([block[7] & ~1 & 0xFF])))
+    tail = block[10:BACK_BLOCK]
+    if any(tail):
+        last = max(i for i, v in enumerate(tail) if v)
+        for off in range(0, last + 1, 58):
+            n = min(58, last + 1 - off)
+            writes.append((f"{key}: clear macro steps", base + 10 + off, tail[off:off + n],
+                           bytes(n)))
+    new = bytes([1, target_code])
+    if block[2:4] != new:
+        writes.append((f"{key} → mapping", base + 2, block[2:4], new))
+    return writes

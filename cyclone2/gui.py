@@ -20,10 +20,11 @@ from importlib import resources
 from urllib.parse import parse_qs, urlsplit
 
 from . import protocol as P
-from .device import CONFIG_PIDS, Cyclone2, DeviceError, find
+from .device import CONFIG_PIDS, Cyclone2, DeviceError, find, read_range
 from .keycodes import KEY_NAMES
-from .layout import (HAIR_TRIGGER_MODES, KEYS, LIGHT_BANK, LIGHT_ZONES, MOTOR_RAW, PROFILE_BANKS,
-                     STICKS, TRIGGERS, hair_trigger, key_map, light_brightness, light_color,
+from .layout import (BACK_BLOCK, BACK_KEYS, BACK_SELF, HAIR_TRIGGER_MODES, KEYS, LIGHT_BANK,
+                     LIGHT_ZONES, MOTOR_RAW, PROFILE_BANKS, STICKS, TRIGGERS, back_map_writes,
+                     decode_back, hair_trigger, key_map, light_brightness, light_color,
                      motors, stick_deadzone, trigger_deadzone)
 from .rumble import find_event_node, rumble
 from .settings import MAP_TARGETS, policy
@@ -33,13 +34,6 @@ LEVEL_OF = {raw: level for level, raw in MOTOR_RAW.items()}
 IDLE_EXIT = 20         # seconds without a page before the server stops
 FIRST_PAGE_WAIT = 300  # seconds to wait for the browser to open the page
 MAX_BODY = 256 * 1024
-
-
-def read_range(dev, bank, offset, length):
-    out = bytearray()
-    for off in range(offset, offset + length, P.CHUNK):
-        out += dev.read(bank, off, min(P.CHUNK, offset + length - off))
-    return bytes(out)
 
 
 def hair_mode(status):
@@ -60,8 +54,7 @@ def _read(dev, pid, profile=None):
     active = dev.current_profile()
     bank = profile or active
     p = bytearray(680)
-    for off, n in ((0x020, 16), (0x040, 112), (0x1EE, 120)):
-        p[off:off + n] = read_range(dev, bank, off, n)
+    p[0x020:0x266] = read_range(dev, bank, 0x020, 0x266 - 0x020)  # motors .. sticks
     effect = dev.read(LIGHT_BANK, 0, 1)[0]
     effect = effect if effect <= 3 else 0            # GSC reads >3 as 0
     anim = read_range(dev, LIGHT_BANK, 1 + 124 * effect, 4 + 15)  # header + frame 1
@@ -90,9 +83,13 @@ def _read(dev, pid, profile=None):
                          "hair": hair_mode(p[hair_trigger(bank, t).offset])} for t in TRIGGERS},
         "vibration": {side: LEVEL_OF.get(p[0x020 + i]) for i, side in enumerate(("left", "right"))},
         "map": {k: mapping(k) for k in KEYS},
+        "macro": {},
         "map_targets": list(MAP_TARGETS),
         "zones": ZONE_LABELS,
     }
+    for key, base in BACK_KEYS.items():
+        state["map"][key], state["macro"][key] = decode_back(p[base:base + BACK_BLOCK], key,
+                                                            KEY_NAMES)
     return state, bytes(p), anim
 
 
@@ -195,6 +192,16 @@ def plan_settings(dev, pid, req):
                    [MOTOR_RAW[v] for v in levels])
 
     for key, target in req.get("map", {}).items():
+        if key in BACK_KEYS:
+            if target != key and target not in MAP_TARGETS:
+                raise DeviceError(f"{key}: unsupported target {target}")
+            if target == cur["map"][key] and not cur["macro"][key]:
+                continue
+            base = BACK_KEYS[key]
+            code = BACK_SELF[key] if target == key else MAP_TARGETS[target]
+            for label, off, old, new in back_map_writes(bank, key, p[base:base + BACK_BLOCK], code):
+                plan.write(label.replace("mapping", target), bank, off, old, new)
+            continue
         if key not in KEYS:
             raise DeviceError(f"unknown button {key}")
         if target != key and target not in MAP_TARGETS:
