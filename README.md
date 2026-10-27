@@ -24,7 +24,7 @@ XInput mode.
 
 | Setting | Command | Verified |
 |---|---|---|
-| Info: firmware versions, active profile | `cyclone2 info` | on device |
+| Info: firmware versions, active profile, battery and charging | `cyclone2 info` (GUI: header) | on device |
 | Read / back up / restore all settings | `get`, `backup`, `restore` | on device |
 | RGB brightness and colours | `set brightness`, `set color` | on device, visible |
 | Stick and trigger deadzones | `set deadzone` | on device, by feel |

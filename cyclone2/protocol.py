@@ -186,6 +186,15 @@ def parse_fw_version(reply):
     return {"controller": one(reply[2:10]), "dongle": one(reply[10:18])}
 
 
+def parse_status(report):
+    """Battery and charging state from an input-stream report (0x12, report
+    ID at byte 0): byte 35 is the charge state (1 = charging) and byte 36 the
+    battery percentage, as GSC's parseGamepadState reads them."""
+    if len(report) < 37 or report[0] != REPORT_STREAM:
+        raise ValueError("not an input-stream report")
+    return {"battery": report[36], "charging": report[35] == 1, "charge_state": report[35]}
+
+
 def parse_read_reply(reply):
     """10 05 / 10 11: (bank, offset, data)."""
     bank, off, n = reply[2], reply[3] << 8 | reply[4], reply[5]

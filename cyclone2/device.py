@@ -98,6 +98,20 @@ class Cyclone2:
                 return data
         raise DeviceError(f"no reply to {pkt[:6].hex(' ')} within {timeout}s")
 
+    def status(self, timeout=1.5):
+        """Battery level and charging state. Sends one heartbeat (0F F2 00),
+        which makes the controller stream report 0x12 for about a second, and
+        decodes the first such report. Changes no setting."""
+        self.send(P.heartbeat())
+        deadline = time.monotonic() + timeout
+        while (left := deadline - time.monotonic()) > 0:
+            data = bytes(self.dev.read(P.REPORT_LEN, max(1, int(left * 1000))))
+            if data[:1] == bytes([P.REPORT_STREAM]) and len(data) >= 37:
+                if self.log:
+                    self.log("in", data)
+                return P.parse_status(data)
+        raise DeviceError("no input report after the heartbeat")
+
     def fw_version(self):
         return P.parse_fw_version(self.transact(P.fw_version(), {P.OP_FW_VERSION_ACK}))
 

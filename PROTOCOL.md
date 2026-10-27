@@ -239,7 +239,13 @@ Decoder `wo`, l. 15277:
   colours (R, G, B) in the order Home, LowerLeft, LowerRight, UpperLeft,
   UpperRight. Byte 53, bits 0 and 1: macro recording; bits 4 and 5: which
   back button. **high**
-- **Conflict:** InFract puts DS4 touchpad data at bytes 34–41 (excluding the
+- **Confirmed on the device** (2026-10-27, `captures/50-battery-dongle.jsonl`,
+  dongle). After one heartbeat, the first 0x12 report had byte 35 = 0x00
+  (not charging), byte 36 = 0x64 (battery 100 %) and byte 37 = 0x03 (the
+  active lighting effect, IV, which matches the light bank). That confirms
+  GSC's offsets. `cyclone2 info` and the GUI show the battery; the GUI
+  refreshes it every 30 s. GSC displays `chargeState == 1` as charging.
+- **Conflict (resolved in GSC's favour):** InFract puts DS4 touchpad data at bytes 34–41 (excluding the
   ID, so 35–42 including it). That overlaps what GSC parses as
   battery/LED. GSC's code wins; resolve by observation.
 - InFract's layout, offsets **excluding** the ID (add 1 for report offsets),

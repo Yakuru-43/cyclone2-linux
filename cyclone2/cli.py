@@ -57,7 +57,7 @@ def planned_packets(args):
     if args.cmd == "profile":
         return [P.current_profile(), P.switch_profile(args.number), P.current_profile()]
     if args.cmd == "info":
-        return [P.fw_version(), P.current_profile()]
+        return [P.fw_version(), P.current_profile(), P.heartbeat()]
     banks = args.bank if args.cmd == "get" else list(ALL_BANKS)
     return [pkt for b in banks for pkt in P.read_bank(b)] + (
         [P.fw_version()] if args.cmd == "backup" else [])
@@ -101,7 +101,8 @@ def make_log(path):
     def log(direction, pkt):
         f.write(json.dumps({"t": round(time.monotonic() - t0, 4), "dir": direction,
                             "hex": pkt.hex(" "),
-                            "op": P.OPCODE_NAMES.get(pkt[1], f"0x{pkt[1]:02x}")}) + "\n")
+                            "op": "InputStream" if pkt[0] == P.REPORT_STREAM else
+                            P.OPCODE_NAMES.get(pkt[1], f"0x{pkt[1]:02x}")}) + "\n")
     return log
 
 
@@ -115,6 +116,11 @@ def cmd_info(dev, path, pid, args):
     else:
         print()
     print(f"profile:  {dev.current_profile()}")
+    try:
+        st = dev.status()
+        print(f"battery:  {st['battery']}%{' (charging)' if st['charging'] else ''}")
+    except DeviceError:
+        print("battery:  unknown (no input report)")
 
 
 def cmd_get(dev, path, pid, args):

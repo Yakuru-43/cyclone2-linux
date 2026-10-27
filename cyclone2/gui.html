@@ -83,6 +83,7 @@ select { background: var(--card); border: 1px solid var(--line); border-radius: 
 <header>
   <h1>Cyclone 2</h1>
   <span class="chip" id="status">connecting…</span>
+  <span class="chip" id="battery" hidden></span>
   <span class="spacer"></span>
   <button id="rumble" title="1-second test rumble at full strength">Test rumble</button>
   <button id="backup">Back up…</button>
@@ -193,6 +194,7 @@ function render() {
   const dev = s.device;
   $("status").textContent = `${dev.connection} · controller ${dev.firmware}` +
     (dev.dongle_firmware ? ` · dongle ${dev.dongle_firmware}` : "");
+  showBattery(s.battery);
   const prof = $("profiles"); prof.replaceChildren(el("span", { class: "chip" }, "Editing"));
   for (const n of [1, 2, 3, 4]) {
     const b = el("button", { class: n === s.profile ? "editing" : "", onclick: () => load(n) },
@@ -263,6 +265,19 @@ function render() {
   refreshPending();
 }
 
+function showBattery(b) {
+  const chip = $("battery");
+  chip.hidden = !b;
+  if (!b) return;
+  chip.textContent = `${b.charging ? "Charging" : "Battery"} ${b.percent}%`;
+  chip.style.color = !b.charging && b.percent <= 15 ? "var(--bad)" : "";
+  chip.title = b.charging ? "Charging over USB" : "Battery level reported by the controller";
+}
+async function refreshBattery() {
+  if (!state || document.hidden || $("overlay").classList.contains("show")) return;
+  try { showBattery((await api("/api/battery")).battery); } catch { /* shown on next reload */ }
+}
+
 // ---- actions -------------------------------------------------------------
 async function load(profile = editing) {
   if (count(edits) && !confirm("Discard unsaved changes?")) return;
@@ -274,6 +289,7 @@ async function load(profile = editing) {
       $("main").replaceChildren(el("div", { class: "empty" }, e.message,
         el("br"), el("br"), el("button", { onclick: () => load(profile) }, "Retry")));
       $("status").textContent = "not connected"; $("profiles").replaceChildren();
+      showBattery(null);
       $("bar").classList.remove("show"); state = null; return;
     }
     editing = state.profile; edits = {}; render();
@@ -342,6 +358,7 @@ $("rumble").onclick = () => busy(async () => { await api("/api/rumble"); toast("
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePlan(); });
 window.addEventListener("beforeunload", (e) => { if (count(edits)) e.preventDefault(); });
 setInterval(() => api("/api/ping").catch(() => {}), 3000);
+setInterval(refreshBattery, 30000);
 load();
 </script>
 </body>

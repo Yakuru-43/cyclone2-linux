@@ -47,3 +47,21 @@ class Packets(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Status(unittest.TestCase):
+    def test_parse_status(self):
+        report = bytearray(64)
+        report[0], report[35], report[36] = 0x12, 1, 87
+        self.assertEqual(P.parse_status(bytes(report)),
+                         {"battery": 87, "charging": True, "charge_state": 1})
+        report[35] = 0
+        self.assertFalse(P.parse_status(bytes(report))["charging"])
+
+    def test_rejects_other_reports(self):
+        with self.assertRaises(ValueError):
+            P.parse_status(bytes([0x10]) + bytes(63))
+
+    def test_heartbeat_is_allowed_read_only(self):
+        self.assertEqual(P.heartbeat()[:3].hex(" "), "0f f2 00")
+        self.assertIsNone(P.check_read_only(P.heartbeat()))

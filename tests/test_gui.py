@@ -42,6 +42,9 @@ class FakeDev:
     def switch_profile(self, n):
         self.profile = n
 
+    def status(self):
+        return {"battery": 87, "charging": False, "charge_state": 0}
+
     def close(self):
         pass
 
@@ -52,6 +55,7 @@ class Plans(unittest.TestCase):
 
     def test_state_reads_known_values(self):
         s = gui.read_state(FakeDev(), 0x1053)
+        self.assertEqual(s["battery"], {"percent": 87, "charging": False})
         self.assertEqual(s["sticks"]["left"], {"enabled": True, "inner": 10, "outer": 100})
         self.assertEqual(s["triggers"]["lt"]["hair"], "off")
         self.assertEqual(s["vibration"], {"left": 4, "right": 4})

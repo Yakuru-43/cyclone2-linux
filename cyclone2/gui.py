@@ -42,6 +42,15 @@ def hair_mode(status):
     return "adaptive" if status == 0x81 else f"unsupported (0x{status:02x})"
 
 
+def battery(dev):
+    """{'battery': %, 'charging': bool} or None if the controller did not say."""
+    try:
+        st = dev.status()
+    except DeviceError:
+        return None
+    return {"percent": st["battery"], "charging": st["charging"]}
+
+
 def read_state(dev, pid, profile=None):
     return _read(dev, pid, profile)[0]
 
@@ -90,6 +99,7 @@ def _read(dev, pid, profile=None):
     for key, base in BACK_KEYS.items():
         state["map"][key], state["macro"][key] = decode_back(p[base:base + BACK_BLOCK], key,
                                                             KEY_NAMES)
+    state["battery"] = battery(dev)
     return state, bytes(p), anim
 
 
@@ -397,6 +407,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 result = s.store(s.run(lambda d, pid: plan_restore(d, pid, body)))
             elif route == "/api/apply":
                 result = {"applied": s.apply(str(body.get("id", "")))}
+            elif route == "/api/battery":
+                result = s.run(lambda d, pid: {"battery": battery(d)})
             elif route == "/api/backup":
                 result = s.run(backup)
             elif route == "/api/rumble":
