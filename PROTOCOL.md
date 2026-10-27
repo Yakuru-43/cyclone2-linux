@@ -245,6 +245,8 @@ Decoder `wo`, l. 15277:
   active lighting effect, IV, which matches the light bank). That confirms
   GSC's offsets. `cyclone2 info` and the GUI show the battery; the GUI
   refreshes it every 30 s. GSC displays `chargeState == 1` as charging.
+  Over the cable (`captures/51-battery-cable.jsonl`), byte 35 = 0x01 even
+  at 100 %: the flag means "on USB power", not "battery still filling".
 - **Conflict (resolved in GSC's favour):** InFract puts DS4 touchpad data at bytes 34–41 (excluding the
   ID, so 35–42 including it). That overlaps what GSC parses as
   battery/LED. GSC's code wins; resolve by observation.
