@@ -56,7 +56,7 @@ class Plans(unittest.TestCase):
     def test_state_reads_known_values(self):
         s = gui.read_state(FakeDev(), 0x1053)
         self.assertEqual(s["battery"], {"percent": 87, "charging": False})
-        self.assertEqual(s["sticks"]["left"], {"enabled": True, "inner": 10, "outer": 100})
+        self.assertEqual(s["sticks"]["left"], {"enabled": True, "inner": 10, "outer": 100, "shape": "circle"})
         self.assertEqual(s["triggers"]["lt"]["hair"], "off")
         self.assertEqual(s["vibration"], {"left": 4, "right": 4})
         self.assertEqual(s["light"]["colors"]["right"], "#ff0500")
@@ -169,3 +169,12 @@ class BackButtonPlans(unittest.TestCase):
         self.assertEqual([i["packet"][:17] for i in items],
                          ["0f 03 01 00 b7 01", "0f 03 01 00 ba 09"])
         self.assertEqual(items[0]["label"], "L4: turn off its macro")
+
+
+class ShapePlans(unittest.TestCase):
+    def test_shape(self):
+        s = gui.read_state(FakeDev(), 0x1053)
+        self.assertEqual(s["sticks"]["left"]["shape"], "circle")
+        items = gui.plan_settings(FakeDev(), 0x1053, {"profile": 1,
+                                  "sticks": {"right": {"shape": "square"}}}).items
+        self.assertEqual([i["packet"] for i in items], ["0f 03 01 02 47 01 01"])

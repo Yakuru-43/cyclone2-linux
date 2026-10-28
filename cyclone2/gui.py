@@ -25,7 +25,7 @@ from .keycodes import KEY_NAMES
 from .layout import (BACK_BLOCK, BACK_KEYS, BACK_SELF, HAIR_TRIGGER_MODES, KEYS, LIGHT_BANK,
                      LIGHT_ZONES, MOTOR_RAW, PROFILE_BANKS, STICKS, TRIGGERS, back_map_writes,
                      decode_back, hair_trigger, key_map, light_brightness, light_color,
-                     motors, stick_deadzone, trigger_deadzone)
+                     motors, stick_deadzone, stick_shape, trigger_deadzone, STICK_SHAPES)
 from .inputs import AxisReader
 from .rumble import find_event_node, rumble
 from .settings import MAP_TARGETS, policy
@@ -88,7 +88,9 @@ def _read(dev, pid, profile=None):
         "light": {"effect": effect, "brightness": anim[3],
                   "colors": {z: "#" + anim[4 + 3 * LIGHT_ZONES[z]:7 + 3 * LIGHT_ZONES[z]].hex()
                              for z in ZONE_LABELS}},
-        "sticks": {s: deadzone(stick_deadzone(bank, s)) for s in STICKS},
+        "sticks": {s: {**deadzone(stick_deadzone(bank, s)),
+                       "shape": "square" if p[stick_shape(bank, s).offset] else "circle"}
+                   for s in STICKS},
         "triggers": {t: {**deadzone(trigger_deadzone(bank, t)),
                          "hair": hair_mode(p[hair_trigger(bank, t).offset])} for t in TRIGGERS},
         "vibration": {side: LEVEL_OF.get(p[0x020 + i]) for i, side in enumerate(("left", "right"))},
@@ -183,6 +185,12 @@ def plan_settings(dev, pid, req):
                 f = field_of(bank, name)
                 plan.write(f"{label} deadzone → {inner}–{outer}", bank, f.offset, raw(f),
                            [inner, outer])
+            if "shape" in want and want["shape"] != have.get("shape"):
+                if group != "sticks" or want["shape"] not in STICK_SHAPES:
+                    raise DeviceError(f"{label}: shape must be circle or square")
+                f = stick_shape(bank, name)
+                plan.write(f"{label} shape → {want['shape']}", bank, f.offset, raw(f),
+                           [STICK_SHAPES[want["shape"]]])
             if "hair" in want and want["hair"] != have["hair"]:
                 if want["hair"] not in HAIR_TRIGGER_MODES:
                     raise DeviceError(f"{label}: hair trigger must be off or adaptive")

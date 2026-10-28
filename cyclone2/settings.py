@@ -7,7 +7,7 @@ owner has approved it (see CLAUDE.md).
 from . import protocol as P
 from .keycodes import KEY_CODES
 from .layout import (BACK_KEYS, KEYS, PROFILE_BANKS, STICKS, TRIGGERS, back_macro_flags,
-                     back_macro_steps, back_map, hair_trigger, key_map, light_brightness,
+                     back_macro_steps, back_map, hair_trigger, stick_shape, key_map, light_brightness,
                      light_color, motors, stick_deadzone, trigger_deadzone)
 
 # Field kinds the owner has approved for writing, one kind at a time (step 6).
@@ -18,6 +18,7 @@ APPROVED_WRITES = [light_brightness(e) for e in range(5)] + [
     hair_trigger(b, t) for b in PROFILE_BANKS for t in TRIGGERS] + [
     key_map(b, k) for b in PROFILE_BANKS for k in KEYS] + [
     motors(b) for b in PROFILE_BANKS] + [
+    stick_shape(b, s) for b in PROFILE_BANKS for s in STICKS] + [
     f(b, k) for b in PROFILE_BANKS for k in BACK_KEYS
     for f in (back_map, back_macro_flags, back_macro_steps)]
 LIGHT_SETTINGS = ("brightness", "color")

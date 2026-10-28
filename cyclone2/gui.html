@@ -86,6 +86,7 @@ select { background: var(--card); border: 1px solid var(--line); border-radius: 
 .sticks figure { margin: 0; text-align: center; }
 .sticks canvas { width: 100%; max-width: 300px; aspect-ratio: 1; background: var(--bg);
                  border-radius: 10px; }
+.sticks figcaption b { display: block; margin-top: 4px; }
 .readout { font: 12px var(--mono); color: var(--muted); margin-top: 6px; white-space: pre-line;
            text-align: left; display: inline-block; }
 .toast { position: fixed; right: 20px; bottom: 76px; background: var(--text); color: var(--bg);
@@ -217,7 +218,12 @@ function deadzone(title, group, name) {
   if (!d.enabled) return el("div", { class: "note" }, `${title}: deadzone disabled in this profile`);
   const inner = slider("Inner", [group, name, "inner"], 0, 99);
   const outer = slider("Outer", [group, name, "outer"], 1, 100);
-  return el("div", {}, el("div", { class: "sub" }, title), inner, outer);
+  const kids = [el("div", { class: "sub" }, title), inner, outer];
+  if (group === "sticks") kids.push(el("div", { class: "row", "data-path": JSON.stringify([group, name, "shape"]),
+    title: "Circle limits diagonals to ~71% per axis; Square passes the full range (~80%)" },
+    el("label", {}, "Shape"),
+    segmented([group, name, "shape"], [["circle", "Circle"], ["square", "Square"]]), el("span")));
+  return el("div", {}, ...kids);
 }
 function segmented(path, options) {
   const wrap = el("div", { class: "seg" });

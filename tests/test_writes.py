@@ -112,9 +112,10 @@ class Deadzone(unittest.TestCase):
     def run_set(self, value, profile=None, setting="deadzone"):
         from argparse import Namespace
         from cyclone2.cli import cmd_set, deadzone_value, hair_trigger_value, planned_packets
-        from cyclone2.cli import map_value, vibration_value
+        from cyclone2.cli import map_value, stick_shape_value, vibration_value
         parse = {"deadzone": deadzone_value, "hair-trigger": hair_trigger_value,
-                 "map": map_value, "vibration": vibration_value}[setting]
+                 "map": map_value, "vibration": vibration_value,
+                 "stick-shape": stick_shape_value}[setting]
         args = Namespace(cmd="set", setting=setting, value=parse(value), profile=profile)
         dev = FakeDevice(self.banks)
         cmd_set(dev, None, None, args)
@@ -338,3 +339,11 @@ class BackButtonsCli(Deadzone):
         self.assertEqual(decode_back(dev.banks[1][0x0B0:0x0B0 + 159], "L4", KEY_NAMES), ("B", None))
         for pkt in dev.sent:
             self.assertIsNone(policy(pkt), pkt[:8].hex(" "))
+
+
+class StickShape(Deadzone):
+    def test_dry_run_and_bytes(self):
+        dev, planned = self.run_set("left=square", setting="stick-shape")
+        self.assertEqual(dev.sent, planned)
+        self.assertEqual(dev.sent[2][:7].hex(" "), "0f 03 01 02 27 01 01")
+        self.assertIsNotNone(policy(P.write_chunk(1, 0x227, [2])))

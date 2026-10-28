@@ -444,6 +444,15 @@ The visible settings are unchanged. **Rule for our tool:** write only the
 bytes of the field being changed, never re-encode a whole bank, and keep the
 factory backup for an exact restore.
 
+**Stick shape (+1, "square"/GSC "rawEnabled"), confirmed 2026-10-28**
+(`captures/60-left-square.jsonl`, owner's Stick test screenshots). With the
+factory 0, the xpad output is a perfect circle: on diagonals each axis
+reaches only about 71 %. Some games read speed per axis and walk slowly on
+diagonals. With 1 (`0F 03 01 02 27 01 01`), the circular limit is gone and
+the left stick traced a rounded square, with corners at about 80–81 % per
+axis (the stick's physical range). CLI: `set stick-shape left=square`;
+GUI: Sticks → Shape.
+
 ### 4.8 Motion block (33 bytes)
 `activate behaviour, quick key, active axis` (bit 0 / bit 1), followed by the
 same deadzone, curve and map sub-blocks as a stick.

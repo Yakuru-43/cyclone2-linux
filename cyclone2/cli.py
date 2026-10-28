@@ -18,7 +18,7 @@ from .layout import (BACK_BLOCK, BACK_KEYS, BACK_SELF, HAIR_TRIGGER_MODES, KEYS,
                      LIGHT_BANK, LIGHT_ZONES, MOTORS, MOTOR_RAW, PROFILE_BANKS, STICKS,
                      TRIGGERS, back_map_writes, decode_back, decode_light, decode_profile,
                      hair_trigger, key_map, light_brightness, light_color, motors,
-                     stick_deadzone, trigger_deadzone)
+                     stick_deadzone, stick_shape, trigger_deadzone, STICK_SHAPES)
 from .rumble import find_event_node, rumble
 from .settings import APPROVED_WRITES, LIGHT_SETTINGS, MAP_TARGETS, policy  # noqa: F401
 
@@ -163,6 +163,10 @@ def profile_plan(args, bank):
         f = (stick_deadzone if target in STICKS else trigger_deadzone)(bank, target)
         data = bytes([inner] if outer is None else [inner, outer])
         return f, (f.offset - 1, 3), data  # enable, inner, outer
+    if args.setting == "stick-shape":
+        stick, shape = args.value
+        f = stick_shape(bank, stick)
+        return f, (f.offset, 1), bytes([STICK_SHAPES[shape]])
     if args.setting == "vibration":
         side, level = args.value
         f = motors(bank)
@@ -193,6 +197,9 @@ def cmd_set_profile_setting(dev, args):
         if not data[0] < outer:
             raise DeviceError(f"the inner deadzone must be below the outer one ({outer})")
         change = f"{old_inner}-{old_outer} -> {data[0]}-{outer}"
+    elif args.setting == "stick-shape":
+        names = {v: k for k, v in STICK_SHAPES.items()}
+        change = f"{names.get(old[0], f'raw {old[0]}')} -> {names[data[0]]}"
     elif args.setting == "vibration":
         levels = {v: k for k, v in MOTOR_RAW.items()}
         lv = lambda raw: str(levels.get(raw, f"raw {raw}"))
@@ -293,6 +300,14 @@ def hair_trigger_value(text):
     return trigger, mode
 
 
+def stick_shape_value(text):
+    """'left=square' -> ('left', 'square')."""
+    stick, _, shape = text.partition("=")
+    if stick not in STICKS or shape not in STICK_SHAPES:
+        raise argparse.ArgumentTypeError("use left|right=circle|square")
+    return stick, shape
+
+
 def vibration_value(text):
     """'3' (both motors) or 'left=2' / 'right=4' -> (side or None, level)."""
     side, _, level = text.rpartition("=")
@@ -391,12 +406,13 @@ def main(argv=None):
     b.add_argument("file")
     st = sub.add_parser("set", help="change one setting (writes to the controller)")
     st.add_argument("setting", choices=["brightness", "color", "deadzone", "hair-trigger",
-                                        "map", "vibration"])
+                                        "map", "vibration", "stick-shape"])
     st.add_argument("value", help="brightness: 0-100\ncolor: ZONE=#RRGGBB, ZONE in "
                     + ", ".join(LIGHT_ZONES) + "\ndeadzone: left|right|lt|rt=INNER[:OUTER]"
                     "\nhair-trigger: lt|rt=" + "|".join(HAIR_TRIGGER_MODES)
                     + "\nmap: BUTTON=TARGET (BUTTON=BUTTON resets it; L4/R4=nothing)"
-                    + "\nvibration: LEVEL | left=LEVEL | right=LEVEL (0-4)")
+                    + "\nvibration: LEVEL | left=LEVEL | right=LEVEL (0-4)"
+                    + "\nstick-shape: left|right=circle|square")
     st.add_argument("--plan", action="store_true",
                     help="map L4/R4: read the controller, print the writes, write nothing")
     st.add_argument("--profile", type=profile_bank, metavar="1-4|shift",
@@ -425,7 +441,8 @@ def main(argv=None):
                           "deadzone": deadzone_value,
                           "hair-trigger": hair_trigger_value,
                           "map": map_value,
-                          "vibration": vibration_value}[args.setting](args.value)
+                          "vibration": vibration_value,
+                          "stick-shape": stick_shape_value}[args.setting](args.value)
         except (argparse.ArgumentTypeError, ValueError) as e:
             ap.error(f"set {args.setting}: {e}")
 

@@ -223,3 +223,14 @@ def back_map_writes(bank, key, block, target_code):
     if block[2:4] != new:
         writes.append((f"{key} → mapping", base + 2, block[2:4], new))
     return writes
+
+
+STICK_SHAPES = {"circle": 0, "square": 1}
+
+
+def stick_shape(bank, stick):
+    """Stick output shape byte (+1): 0 = circular limit (factory), 1 = not
+    limited to a circle (GSC 'raw'; to be confirmed with the Stick test)."""
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.{stick}_stick.shape", bank, STICKS[stick] + 1, 1, 0, 1)
