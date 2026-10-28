@@ -82,6 +82,12 @@ select { background: var(--card); border: 1px solid var(--line); border-radius: 
 .battery.low { color: var(--bad); border-color: var(--bad); }
 .battery.charging { border-color: var(--ok); }
 .batt-text b { font-variant-numeric: tabular-nums; }
+.sticks { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.sticks figure { margin: 0; text-align: center; }
+.sticks canvas { width: 100%; max-width: 300px; aspect-ratio: 1; background: var(--bg);
+                 border-radius: 10px; }
+.readout { font: 12px var(--mono); color: var(--muted); margin-top: 6px; white-space: pre-line;
+           text-align: left; display: inline-block; }
 .toast { position: fixed; right: 20px; bottom: 76px; background: var(--text); color: var(--bg);
          padding: 10px 14px; border-radius: 10px; opacity: 0; transition: opacity .2s;
          pointer-events: none; max-width: 420px; z-index: 6; }
@@ -100,6 +106,7 @@ select { background: var(--card); border: 1px solid var(--line); border-radius: 
     <span class="batt-text" id="batt-text"></span>
   </span>
   <span class="spacer"></span>
+  <button id="sticktest" title="See what games receive from the sticks">Stick test</button>
   <button id="rumble" title="1-second test rumble at full strength">Test rumble</button>
   <button id="backup">Back up…</button>
   <button id="restore">Restore…</button>
@@ -118,6 +125,23 @@ select { background: var(--card); border: 1px solid var(--line); border-radius: 
   <div class="body" id="m-body"></div>
   <div class="foot"><button id="m-cancel">Cancel</button>
     <button class="primary" id="m-ok">Apply</button></div>
+</div></div>
+<div class="overlay" id="sticks-overlay"><div class="modal" style="width:min(760px,100%)">
+  <h3>Stick test</h3>
+  <div class="body">
+    <div class="note">What games receive from the controller. Slowly sweep each stick
+      around its edge a few times: the outline shows the shape it reaches.</div>
+    <div class="sticks">
+      <figure><canvas id="cv-left" width="300" height="300"></canvas>
+        <figcaption><b>Left stick</b><div id="rd-left" class="readout"></div></figcaption></figure>
+      <figure><canvas id="cv-right" width="300" height="300"></canvas>
+        <figcaption><b>Right stick</b><div id="rd-right" class="readout"></div></figcaption></figure>
+    </div>
+    <div class="note" id="sticks-legend">Grey circle and square: reference shapes.
+      Red: the furthest you have pushed in each direction. Dot: the stick now.</div>
+  </div>
+  <div class="foot"><button id="sticks-reset">Reset</button>
+    <button class="primary" id="sticks-close">Close</button></div>
 </div></div>
 <div class="toast" id="toast"></div>
 <script>
@@ -295,7 +319,7 @@ function showBattery(b) {
                          : "Battery level reported by the controller";
 }
 async function refreshBattery() {
-  if (document.hidden || $("overlay").classList.contains("show")) return;
+  if (document.hidden || $("overlay").classList.contains("show") || stickTimer) return;
   if (!state) return load(editing);              // try to reconnect
   try {
     const r = await api("/api/battery");
@@ -375,6 +399,75 @@ async function doRestore(file) {
   $("restore-file").value = "";
 }
 
+// ---- stick test ------------------------------------------------------------
+const BINS = 72;
+let stickTimer = null, env = {};
+function resetEnvelope() {
+  env = { left: { r: new Array(BINS).fill(0), corners: [0, 0, 0, 0].map(() => [0, 0]) },
+          right: { r: new Array(BINS).fill(0), corners: [0, 0, 0, 0].map(() => [0, 0]) } };
+}
+function drawStick(side, pos) {
+  const cv = $(`cv-${side}`), g = cv.getContext("2d"), W = cv.width, c = W / 2, R = W * 0.42;
+  const css = getComputedStyle(document.body);
+  const muted = css.getPropertyValue("--muted"), accent = css.getPropertyValue("--accent");
+  g.clearRect(0, 0, W, W);
+  g.strokeStyle = muted; g.globalAlpha = 0.45; g.lineWidth = 1;
+  g.strokeRect(c - R, c - R, 2 * R, 2 * R);
+  g.beginPath(); g.arc(c, c, R, 0, 2 * Math.PI); g.stroke();
+  g.beginPath(); g.moveTo(c - R, c); g.lineTo(c + R, c); g.moveTo(c, c - R); g.lineTo(c, c + R); g.stroke();
+  g.globalAlpha = 1;
+  const e = env[side];
+  if (pos[0] !== null) {
+    const [x, y] = pos, r = Math.hypot(x, y), a = Math.atan2(y, x);
+    const bin = ((Math.round(a / (2 * Math.PI) * BINS) % BINS) + BINS) % BINS;
+    e.r[bin] = Math.max(e.r[bin], r);
+    // corners: up-right, up-left, down-left, down-right (within 10° of the diagonal)
+    const deg = (a * 180 / Math.PI + 360) % 360;
+    [45, 135, 225, 315].forEach((d, i) => {
+      if (Math.abs(deg - d) <= 10 && Math.min(Math.abs(x), Math.abs(y)) > Math.min(...e.corners[i]))
+        e.corners[i] = [Math.abs(x), Math.abs(y)];
+    });
+  }
+  if (e.r.some((v) => v > 0.05)) {
+    g.strokeStyle = accent; g.lineWidth = 2; g.beginPath();
+    e.r.forEach((r, i) => {
+      const a = i / BINS * 2 * Math.PI, px = c + Math.cos(a) * r * R, py = c - Math.sin(a) * r * R;
+      i ? g.lineTo(px, py) : g.moveTo(px, py);
+    });
+    g.closePath(); g.stroke();
+  }
+  if (pos[0] !== null) {
+    g.fillStyle = accent; g.beginPath();
+    g.arc(c + pos[0] * R, c - pos[1] * R, 6, 0, 2 * Math.PI); g.fill();
+  }
+  const pct = (v) => `${Math.round(v * 100)}`.padStart(4);
+  const names = ["up-right", "up-left", "down-left", "down-right"];
+  const seen = e.corners.filter((k) => k[0] > 0.3);
+  const avg = seen.length ? seen.reduce((s, k) => s + Math.min(k[0], k[1]), 0) / seen.length : 0;
+  const verdict = !seen.length ? "push into the corners to measure them" :
+    avg >= 0.9 ? "square-like: both axes reach full on diagonals" :
+    avg >= 0.8 ? "between circle and square" :
+    "circular: on diagonals each axis stops near 71%";
+  $(`rd-${side}`).textContent = pos[0] === null ? "no data" :
+    `x ${pct(pos[0])}%   y ${pct(pos[1])}%   distance ${pct(Math.hypot(...pos))}%\n` +
+    e.corners.map((k, i) => `${names[i].padEnd(10)} x ${pct(k[0])}%  y ${pct(k[1])}%`).join("\n") +
+    `\n→ ${verdict}`;
+}
+async function stickTick() {
+  try {
+    const s = await api("/api/sticks");
+    drawStick("left", s.left); drawStick("right", s.right);
+  } catch (e) { closeSticks(); toast(e.message, true); }
+}
+function openSticks() {
+  resetEnvelope(); $("sticks-overlay").classList.add("show");
+  stickTimer = setInterval(stickTick, 33); stickTick();
+}
+function closeSticks() { clearInterval(stickTimer); stickTimer = null; $("sticks-overlay").classList.remove("show"); }
+$("sticktest").onclick = openSticks;
+$("sticks-close").onclick = closeSticks;
+$("sticks-reset").onclick = resetEnvelope;
+
 $("reload").onclick = () => load();
 $("discard").onclick = () => { edits = {}; render(); };
 $("review").onclick = review;
@@ -384,7 +477,7 @@ $("backup").onclick = doBackup;
 $("restore").onclick = () => $("restore-file").click();
 $("restore-file").onchange = (e) => doRestore(e.target.files[0]);
 $("rumble").onclick = () => busy(async () => { await api("/api/rumble"); toast("Rumble sent."); });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePlan(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closePlan(); closeSticks(); } });
 window.addEventListener("beforeunload", (e) => { if (count(edits)) e.preventDefault(); });
 setInterval(() => api("/api/ping").catch(() => {}), 3000);
 setInterval(refreshBattery, 10000);

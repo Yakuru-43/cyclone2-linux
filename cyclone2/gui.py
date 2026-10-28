@@ -26,6 +26,7 @@ from .layout import (BACK_BLOCK, BACK_KEYS, BACK_SELF, HAIR_TRIGGER_MODES, KEYS,
                      LIGHT_ZONES, MOTOR_RAW, PROFILE_BANKS, STICKS, TRIGGERS, back_map_writes,
                      decode_back, hair_trigger, key_map, light_brightness, light_color,
                      motors, stick_deadzone, trigger_deadzone)
+from .inputs import AxisReader
 from .rumble import find_event_node, rumble
 from .settings import MAP_TARGETS, policy
 
@@ -233,6 +234,20 @@ class Session:
         self.dev = None
         self.pid = None
         self.plans = {}
+        self.axes = None
+        self.axes_lock = threading.Lock()
+
+    def sticks(self):
+        """What games see on the xpad device (read-only; no packets sent)."""
+        with self.axes_lock:
+            if self.axes and self.axes.error:
+                self.axes = None
+            if self.axes is None:
+                found = find()
+                if len(found) != 1:
+                    raise DeviceError("Controller not found.")
+                self.axes = AxisReader(find_event_node(found[0][0]))
+            return self.axes.snapshot()
 
     def _close(self):
         if self.dev:
@@ -407,6 +422,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 result = s.store(s.run(lambda d, pid: plan_restore(d, pid, body)))
             elif route == "/api/apply":
                 result = {"applied": s.apply(str(body.get("id", "")))}
+            elif route == "/api/sticks":
+                result = s.sticks()
             elif route == "/api/battery":
                 result = s.run(lambda d, pid: {"battery": battery(d),
                                                "connection": CONFIG_PIDS[pid]})
