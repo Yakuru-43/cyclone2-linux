@@ -278,8 +278,8 @@ def cmd_sticks(args):
             print(f"  {i}. {name}  ({p})")
         choice = input(f"which controller? [1-{len(pads)}] ") if len(pads) > 1 else "1"
         path = pads[int(choice) - 1][0]
-    print(f"Sweep both sticks slowly around their full edge for {args.seconds} s, "
-          "pressing into the corners...")
+    print(f"Sweep BOTH sticks (one after the other is fine) slowly around their full "
+          f"edge for {args.seconds} s, pressing into the corners...")
     res = measure(path, args.seconds)
     names = ("up-right", "up-left", "down-left", "down-right")
     for side in ("left", "right"):

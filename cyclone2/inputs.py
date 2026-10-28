@@ -10,6 +10,7 @@ import math
 import os
 import select
 import struct
+import sys
 import threading
 import time
 from pathlib import Path
@@ -104,6 +105,7 @@ def measure(event_path, seconds=15, live=print):
     r = AxisReader(event_path)
     corners = {s: [[0.0, 0.0] for _ in range(4)] for s in ("left", "right")}
     maxr = {"left": 0.0, "right": 0.0}
+    tty, last_second = sys.stdout.isatty(), None
     end = time.monotonic() + seconds
     try:
         while (left := end - time.monotonic()) > 0:
@@ -118,12 +120,19 @@ def measure(event_path, seconds=15, live=print):
                     c = corners[side][i]
                     if abs(deg - d) <= 10 and min(abs(x), abs(y)) > min(c):
                         corners[side][i] = [abs(x), abs(y)]
-            lx, ly = snap["left"]
-            live(f"\r{left:4.1f}s left  x {lx or 0:+.2f} y {ly or 0:+.2f}   ", end="", flush=True)
+            (lx, ly), (rx, ry) = snap["left"], snap["right"]
+            line = (f"{left:4.1f}s  left x {lx or 0:+.2f} y {ly or 0:+.2f}   "
+                    f"right x {rx or 0:+.2f} y {ry or 0:+.2f}")
+            if tty:
+                live("\r" + line, end="", flush=True)
+            elif int(left) != last_second:          # not a terminal: once a second
+                last_second = int(left)
+                live(line, flush=True)
             time.sleep(0.01)
     finally:
         r.close()
-        live("")
+        if tty:
+            live("")
     return {s: {"corners": corners[s], "max_distance": maxr[s]} for s in corners}
 
 
