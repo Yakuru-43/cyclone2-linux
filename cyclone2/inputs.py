@@ -1,14 +1,18 @@
-"""Read what games see: the controller's XInput (xpad) stick and trigger axes.
+"""Read what games see: stick and trigger axes from an input event device
+(the Cyclone 2's xpad device, or any other gamepad for `cyclone2 sticks`).
 
 Opens the event device read-only and without grabbing it, so games keep
 working. Standard library only.
 """
 
 import fcntl
+import math
 import os
 import select
 import struct
 import threading
+import time
+from pathlib import Path
 
 EV_ABS = 0x03
 ABS_X, ABS_Y, ABS_Z, ABS_RX, ABS_RY, ABS_RZ = 0, 1, 2, 3, 4, 5
@@ -76,3 +80,58 @@ class AxisReader:
                     "right": [self.values.get(ABS_RX), self.values.get(ABS_RY)]},
             "range": {k: self.info.get(c) for k, c in (("x", ABS_X), ("y", ABS_Y))},
         }
+
+
+def list_gamepads():
+    """[(event path, name)] for input devices with stick axes and gamepad buttons."""
+    pads = []
+    for ev in sorted(Path("/sys/class/input").glob("event*"), key=lambda p: int(p.name[5:])):
+        dev = ev / "device"
+        try:
+            abs_bits = int((dev / "capabilities/abs").read_text().split()[-1], 16)
+            key_words = (dev / "capabilities/key").read_text().split()
+            name = (dev / "name").read_text().strip()
+        except (OSError, ValueError):
+            continue
+        keys = int("".join(w.rjust(16, "0") for w in key_words), 16)
+        if abs_bits & 0b11 == 0b11 and keys >> 0x130 & 1:   # ABS_X+ABS_Y, BTN_SOUTH
+            pads.append((f"/dev/input/{ev.name}", name))
+    return pads
+
+
+def measure(event_path, seconds=15, live=print):
+    """Record stick positions for `seconds`; return per-stick corner reach."""
+    r = AxisReader(event_path)
+    corners = {s: [[0.0, 0.0] for _ in range(4)] for s in ("left", "right")}
+    maxr = {"left": 0.0, "right": 0.0}
+    end = time.monotonic() + seconds
+    try:
+        while (left := end - time.monotonic()) > 0:
+            snap = r.snapshot()
+            for side in ("left", "right"):
+                x, y = snap[side]
+                if x is None:
+                    continue
+                maxr[side] = max(maxr[side], math.hypot(x, y))
+                deg = (math.degrees(math.atan2(y, x)) + 360) % 360
+                for i, d in enumerate((45, 135, 225, 315)):
+                    c = corners[side][i]
+                    if abs(deg - d) <= 10 and min(abs(x), abs(y)) > min(c):
+                        corners[side][i] = [abs(x), abs(y)]
+            lx, ly = snap["left"]
+            live(f"\r{left:4.1f}s left  x {lx or 0:+.2f} y {ly or 0:+.2f}   ", end="", flush=True)
+            time.sleep(0.01)
+    finally:
+        r.close()
+        live("")
+    return {s: {"corners": corners[s], "max_distance": maxr[s]} for s in corners}
+
+
+def verdict(corners):
+    seen = [c for c in corners if c[0] > 0.3]
+    if not seen:
+        return "corners not reached"
+    avg = sum(min(c) for c in seen) / len(seen)
+    return ("square-like: both axes reach full on diagonals" if avg >= 0.9 else
+            "between circle and square" if avg >= 0.78 else
+            "circular: on diagonals each axis stops near 71%")

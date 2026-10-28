@@ -100,6 +100,7 @@ cyclone2 set map L4=A --plan           #   show the exact writes first (L4/R4 on
 cyclone2 set vibration 4               # levels 0-4; left=N / right=N for one motor
 cyclone2 profile 2                     # switch the active profile (1-4)
 
+cyclone2 sticks                        # stick shape test for ANY controller (read-only)
 cyclone2 restore ~/cyclone2-backup.json --plan   # show what would change
 cyclone2 restore ~/cyclone2-backup.json          # write back only the differences
 ```

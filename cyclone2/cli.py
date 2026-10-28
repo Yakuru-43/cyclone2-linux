@@ -264,6 +264,33 @@ def cmd_set_back(dev, args):
     print("written and read back")
 
 
+def cmd_sticks(args):
+    """Corner-reach test for any controller (read-only, sends nothing)."""
+    from .inputs import list_gamepads, measure, verdict
+    pads = list_gamepads()
+    if args.input:
+        path = args.input
+    elif not pads:
+        print("no gamepad found", file=sys.stderr)
+        return 1
+    else:
+        for i, (p, name) in enumerate(pads, 1):
+            print(f"  {i}. {name}  ({p})")
+        choice = input(f"which controller? [1-{len(pads)}] ") if len(pads) > 1 else "1"
+        path = pads[int(choice) - 1][0]
+    print(f"Sweep both sticks slowly around their full edge for {args.seconds} s, "
+          "pressing into the corners...")
+    res = measure(path, args.seconds)
+    names = ("up-right", "up-left", "down-left", "down-right")
+    for side in ("left", "right"):
+        r = res[side]
+        print(f"{side} stick: furthest push {r['max_distance'] * 100:.0f}%")
+        for n, (x, y) in zip(names, r["corners"]):
+            print(f"  {n:10} x {x * 100:3.0f}%  y {y * 100:3.0f}%")
+        print(f"  -> {verdict(r['corners'])}")
+    return 0
+
+
 def cmd_set(dev, path, pid, args):
     if args.setting == "map" and args.value[0] in BACK_KEYS:
         return cmd_set_back(dev, args)
@@ -427,6 +454,10 @@ def main(argv=None):
     ru.add_argument("--strong", type=percent, default=100, help="left/large motor, %%")
     ru.add_argument("--weak", type=percent, default=100, help="right/small motor, %%")
     ru.add_argument("--ms", type=int, default=1000, help="duration (default 1000)")
+    sk = sub.add_parser("sticks", help="stick shape / corner test for ANY controller "
+                                       "(read-only)")
+    sk.add_argument("--input", metavar="/dev/input/eventN", help="skip the menu")
+    sk.add_argument("--seconds", type=int, default=15)
     gu = sub.add_parser("gui", help="open the graphical interface in your browser")
     gu.add_argument("--no-browser", action="store_true",
                     help="only print the address; open it yourself")
@@ -456,6 +487,8 @@ def main(argv=None):
             ap.error("--dry-run needs --effect (the active one is read from the device)")
         if args.setting not in LIGHT_SETTINGS and args.profile is None:
             ap.error("--dry-run needs --profile (the active one is read from the device)")
+    if args.cmd == "sticks":
+        return cmd_sticks(args)
     if args.cmd == "gui":
         from .gui import main as gui_main
         return gui_main(no_browser=args.no_browser)
