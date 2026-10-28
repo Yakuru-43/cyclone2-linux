@@ -234,3 +234,13 @@ def stick_shape(bank, stick):
     if bank not in PROFILE_BANKS:
         raise ValueError("bank must be 1-5")
     return Field(f"profile{bank}.{stick}_stick.shape", bank, STICKS[stick] + 1, 1, 0, 1)
+
+
+REPORT_RATE_HZ = {0: 250, 1: 500, 2: 1000}   # 0 and 2 confirmed (GSC log); 1 per InFract
+
+
+def report_rate(bank):
+    """Polling (report) rate byte in Fun_Data (0x02E): 0 = 250, 1 = 500, 2 = 1000 Hz."""
+    if bank not in PROFILE_BANKS:
+        raise ValueError("bank must be 1-5")
+    return Field(f"profile{bank}.report_rate", bank, 0x02E, 1, 0, 2)

@@ -17,7 +17,7 @@ class Writes(unittest.TestCase):
         for pkt in [P.write_chunk(0x20, 0x178, [101]),        # out of range
                     P.write_chunk(0x20, 0x177, [1]),          # speed, not approved
                     P.write_chunk(0x20, 0x178, [1, 1]),       # spills past the field
-                    P.write_chunk(1, 0x2E, [2]),              # report rate, not approved
+                    P.write_chunk(1, 0x2E, [3]),              # report rate: no such code
                     P.write_chunk(1, 0x39E, [1] * 6),         # device ID
                     P.packet(0x17, 0x55, 0x88), P.packet(0xFC), P.packet(0x07, 5)]:
             self.assertIsNotNone(policy(pkt), pkt[:7].hex(" "))
@@ -347,3 +347,16 @@ class StickShape(Deadzone):
         self.assertEqual(dev.sent, planned)
         self.assertEqual(dev.sent[2][:7].hex(" "), "0f 03 01 02 27 01 01")
         self.assertIsNotNone(policy(P.write_chunk(1, 0x227, [2])))
+
+
+class ReportRate(Deadzone):
+    def test_dry_run_and_bytes(self):
+        from argparse import Namespace
+        from cyclone2.cli import cmd_set, planned_packets, report_rate_value
+        args = Namespace(cmd="set", setting="report-rate", value=report_rate_value("500"),
+                         profile=None)
+        dev = FakeDevice(self.banks)
+        cmd_set(dev, None, None, args)
+        self.assertEqual(dev.sent, planned_packets(Namespace(**{**vars(args), "profile": 1})))
+        self.assertEqual(dev.sent[2][:7].hex(" "), "0f 03 01 00 2e 01 01")
+        self.assertEqual(report_rate_value("1000Hz"), 2)

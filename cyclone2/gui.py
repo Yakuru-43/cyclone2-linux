@@ -25,7 +25,8 @@ from .keycodes import KEY_NAMES
 from .layout import (BACK_BLOCK, BACK_KEYS, BACK_SELF, HAIR_TRIGGER_MODES, KEYS, LIGHT_BANK,
                      LIGHT_ZONES, MOTOR_RAW, PROFILE_BANKS, STICKS, TRIGGERS, back_map_writes,
                      decode_back, hair_trigger, key_map, light_brightness, light_color,
-                     motors, stick_deadzone, stick_shape, trigger_deadzone, STICK_SHAPES)
+                     motors, stick_deadzone, stick_shape, trigger_deadzone, STICK_SHAPES,
+                     REPORT_RATE_HZ, report_rate)
 from .inputs import AxisReader
 from .rumble import find_event_node, rumble
 from .settings import MAP_TARGETS, policy
@@ -95,6 +96,7 @@ def _read(dev, pid, profile=None):
                          "hair": hair_mode(p[hair_trigger(bank, t).offset])} for t in TRIGGERS},
         "vibration": {side: LEVEL_OF.get(p[0x020 + i]) for i, side in enumerate(("left", "right"))},
         "map": {k: mapping(k) for k in KEYS},
+        "report_rate": REPORT_RATE_HZ.get(p[0x02E]),
         "macro": {},
         "map_targets": list(MAP_TARGETS),
         "zones": ZONE_LABELS,
@@ -200,6 +202,14 @@ def plan_settings(dev, pid, req):
                 plan.write(f"{label} hair trigger → {want['hair']}", bank, f.offset, raw(f),
                            [HAIR_TRIGGER_MODES[want["hair"]]])
 
+    if "report_rate" in req:
+        codes = {hz: code for code, hz in REPORT_RATE_HZ.items()}
+        if req["report_rate"] not in codes:
+            raise DeviceError("polling rate must be 250, 500 or 1000 Hz")
+        f = report_rate(bank)
+        plan.write(f"Polling rate → {req['report_rate']} Hz", bank, f.offset, raw(f),
+                   [codes[req["report_rate"]]])
+
     vib = req.get("vibration", {})
     if vib:
         levels = [vib.get(side, cur["vibration"][side]) for side in ("left", "right")]
@@ -244,6 +254,11 @@ class Session:
         self.plans = {}
         self.axes = None
         self.axes_lock = threading.Lock()
+
+    def rate(self):
+        """Input reports per second over the last second (read-only)."""
+        self.sticks()
+        return {"hz": self.axes.rate()}
 
     def sticks(self):
         """What games see on the xpad device (read-only; no packets sent)."""
@@ -432,6 +447,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 result = {"applied": s.apply(str(body.get("id", "")))}
             elif route == "/api/sticks":
                 result = s.sticks()
+            elif route == "/api/rate":
+                result = s.rate()
             elif route == "/api/battery":
                 result = s.run(lambda d, pid: {"battery": battery(d),
                                                "connection": CONFIG_PIDS[pid]})

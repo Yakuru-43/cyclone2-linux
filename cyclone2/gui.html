@@ -36,6 +36,21 @@ button:disabled { opacity: .5; cursor: default; }
                  background: var(--ok); margin-left: 6px; vertical-align: middle; }
 main { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
        gap: 14px; padding: 0 20px 90px; }
+@media (min-width: 1100px) {
+  main { grid-template-columns: 1fr 1.15fr 1fr;
+         grid-template-areas: "light pad sticks" "trig pad vib" "ctrl buttons buttons"; }
+  #c-light { grid-area: light; } #c-pad { grid-area: pad; } #c-sticks { grid-area: sticks; }
+  #c-trig { grid-area: trig; } #c-vib { grid-area: vib; } #c-ctrl { grid-area: ctrl; }
+  #c-buttons { grid-area: buttons; }
+}
+#c-pad { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#c-pad svg { width: 100%; max-width: 440px; height: auto; }
+#c-pad .caption { font-size: 12px; color: var(--muted); text-align: center; margin-top: 6px; }
+.pad-body { fill: var(--bg); stroke: var(--line); stroke-width: 2; }
+.pad-part { fill: var(--card); stroke: var(--line); stroke-width: 1.5; }
+.pad-label { fill: var(--muted); font: 600 11px system-ui, sans-serif; text-anchor: middle;
+             dominant-baseline: central; }
+.led { transition: stroke .15s, fill .15s, opacity .15s; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
 .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted);
            margin: 0 0 10px; font-weight: 600; }
@@ -201,6 +216,7 @@ function setEdit(path, value) {
   for (const k of path.slice(0, -1)) o = o[k] ??= {};
   if (value === base) delete o[path.at(-1)]; else o[path.at(-1)] = value;
   prune(edits); refreshPending();
+  if (path[0] === "light") updatePad();
 }
 function prune(o) {
   for (const k of Object.keys(o)) if (typeof o[k] === "object") {
@@ -338,7 +354,22 @@ function render() {
       "button turns off any macro on it, as GameSir Connect does; restore a backup to bring " +
       "a macro back."));
 
-  $("main").replaceChildren(light, sticks, triggers, vib, buttons);
+  const ctrl = el("section", { class: "card", id: "c-ctrl" }, el("h2", {}, "Controller"),
+    el("div", { class: "row", "data-path": JSON.stringify(["report_rate"]),
+                title: "How often the controller reports its state to the PC" },
+      el("label", {}, "Polling rate"),
+      s.report_rate ? segmented(["report_rate"], [["250", "250 Hz"], ["500", "500 Hz"], ["1000", "1000 Hz"]])
+                    : el("span", { class: "note" }, "unknown value"), el("span")),
+    el("div", { class: "row" }, el("label", {}, "Measured"),
+      el("button", { onclick: measureRate, title: "Keep moving a stick for 3 seconds" }, "Measure"),
+      el("span", { class: "val", id: "rate-out" }, "")),
+    el("div", { class: "note" }, "Measure counts the reports the PC actually receives. Keep a " +
+       "stick moving while it runs; the result stays a little below the setting."));
+
+  light.id = "c-light"; sticks.id = "c-sticks"; triggers.id = "c-trig"; vib.id = "c-vib";
+  buttons.id = "c-buttons";
+  $("main").replaceChildren(light, padCard(), sticks, triggers, vib, ctrl, buttons);
+  updatePad();
   refreshPending();
 }
 
@@ -369,7 +400,56 @@ async function refreshBattery() {
   }
 }
 
+// ---- controller picture -----------------------------------------------------
+// An original, simplified drawing (not GameSir artwork). LED zones light up in
+// the current colours at the current brightness, including unsaved edits.
+const PAD_SVG = `
+<svg viewBox="0 0 440 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Controller lighting preview">
+  <defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter></defs>
+  <path class="pad-body" d="M140 48 Q220 32 300 48 L345 58 Q392 70 410 140 L428 228 Q436 272 394 278
+    Q360 282 338 244 L310 196 Q220 184 130 196 L102 244 Q80 282 46 278 Q4 272 12 228 L30 140 Q48 70 95 58 Z"/>
+  <path class="led" data-zone="left" d="M44 112 Q26 170 34 238" fill="none" stroke-width="9" stroke-linecap="round"/>
+  <path class="led" data-zone="right" d="M396 112 Q414 170 406 238" fill="none" stroke-width="9" stroke-linecap="round"/>
+  <circle class="pad-part" cx="140" cy="112" r="30"/><circle class="pad-part" cx="140" cy="112" r="18"/>
+  <circle class="pad-part" cx="268" cy="170" r="30"/><circle class="pad-part" cx="268" cy="170" r="18"/>
+  <path class="pad-part" d="M162 152 h14 v-14 h14 v14 h14 v14 h-14 v14 h-14 v-14 h-14 z"/>
+  <g class="pad-part"><circle cx="318" cy="88" r="11"/><circle cx="296" cy="110" r="11"/>
+    <circle cx="340" cy="110" r="11"/><circle cx="318" cy="132" r="11"/></g>
+  <text class="pad-label" x="318" y="88">Y</text><text class="pad-label" x="296" y="110">X</text>
+  <text class="pad-label" x="340" y="110">B</text><text class="pad-label" x="318" y="132">A</text>
+  <rect class="pad-part" x="183" y="104" width="16" height="10" rx="5"/>
+  <rect class="pad-part" x="241" y="104" width="16" height="10" rx="5"/>
+  <circle class="pad-part" cx="220" cy="84" r="17"/>
+  <circle class="led" data-zone="home" cx="220" cy="84" r="17" fill="none" stroke-width="4"/>
+  <circle class="led" data-zone="m" cx="220" cy="122" r="5"/>
+  <rect class="pad-part" x="208" y="134" width="24" height="14" rx="4"/>
+  <text class="pad-label" x="220" y="141">M</text>
+</svg>`;
+function padCard() {
+  const card = el("section", { class: "card", id: "c-pad" });
+  card.innerHTML = PAD_SVG;
+  card.append(el("div", { class: "caption", id: "pad-caption" }));
+  return card;
+}
+function updatePad() {
+  if (!state) return;
+  const b = current(["light", "brightness"]) / 100;
+  document.querySelectorAll("#c-pad .led").forEach((led) => {
+    const on = b > 0;
+    const paint = on ? current(["light", "colors", led.dataset.zone]) : "var(--line)";
+    if (led.getAttribute("fill") === "none") led.style.stroke = paint; else led.style.fill = paint;
+    led.style.opacity = on ? String(0.35 + 0.65 * b) : "1";
+    if (on) led.setAttribute("filter", "url(#glow)"); else led.removeAttribute("filter");
+  });
+  const cap = $("pad-caption");
+  if (cap) cap.textContent = b > 0 ? `Lighting preview · brightness ${Math.round(b * 100)}%` +
+    (edits.light ? " (unsaved)" : "") : "LEDs off (brightness 0)";
+}
+
 // ---- actions -------------------------------------------------------------
+
 async function load(profile = editing) {
   if (count(edits) && !confirm("Discard unsaved changes?")) return;
   await busy(async () => {
@@ -412,6 +492,19 @@ async function applyPlan() {
 async function review() {
   await busy(async () => showPlan("Review changes",
     await api("/api/plan", { profile: state.profile, ...edits }), () => load(state.profile)));
+}
+async function measureRate() {
+  const out = $("rate-out");
+  out.textContent = "…";
+  toast("Keep moving a stick for 3 seconds…");
+  let best = 0;
+  for (let i = 0; i < 6; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    try { best = Math.max(best, (await api("/api/rate")).hz); }
+    catch (e) { out.textContent = ""; return toast(e.message, true); }
+  }
+  out.textContent = best ? `${best} Hz` : "–";
+  if (!best) toast("No movement seen: move a stick while measuring.", true);
 }
 async function makeActive() {
   await busy(async () => showPlan(`Make profile ${state.profile} active`,

@@ -18,7 +18,8 @@ from .layout import (BACK_BLOCK, BACK_KEYS, BACK_SELF, HAIR_TRIGGER_MODES, KEYS,
                      LIGHT_BANK, LIGHT_ZONES, MOTORS, MOTOR_RAW, PROFILE_BANKS, STICKS,
                      TRIGGERS, back_map_writes, decode_back, decode_light, decode_profile,
                      hair_trigger, key_map, light_brightness, light_color, motors,
-                     stick_deadzone, stick_shape, trigger_deadzone, STICK_SHAPES)
+                     stick_deadzone, stick_shape, trigger_deadzone, STICK_SHAPES,
+                     REPORT_RATE_HZ, report_rate)
 from .rumble import find_event_node, rumble
 from .settings import APPROVED_WRITES, LIGHT_SETTINGS, MAP_TARGETS, policy  # noqa: F401
 
@@ -163,6 +164,9 @@ def profile_plan(args, bank):
         f = (stick_deadzone if target in STICKS else trigger_deadzone)(bank, target)
         data = bytes([inner] if outer is None else [inner, outer])
         return f, (f.offset - 1, 3), data  # enable, inner, outer
+    if args.setting == "report-rate":
+        f = report_rate(bank)
+        return f, (f.offset, 1), bytes([args.value])
     if args.setting == "stick-shape":
         stick, shape = args.value
         f = stick_shape(bank, stick)
@@ -197,6 +201,9 @@ def cmd_set_profile_setting(dev, args):
         if not data[0] < outer:
             raise DeviceError(f"the inner deadzone must be below the outer one ({outer})")
         change = f"{old_inner}-{old_outer} -> {data[0]}-{outer}"
+    elif args.setting == "report-rate":
+        change = (f"{REPORT_RATE_HZ.get(old[0], f'raw {old[0]}')} Hz -> "
+                  f"{REPORT_RATE_HZ[data[0]]} Hz")
     elif args.setting == "stick-shape":
         names = {v: k for k, v in STICK_SHAPES.items()}
         change = f"{names.get(old[0], f'raw {old[0]}')} -> {names[data[0]]}"
@@ -327,6 +334,14 @@ def hair_trigger_value(text):
     return trigger, mode
 
 
+def report_rate_value(text):
+    """'1000' -> 2 (the stored code)."""
+    codes = {str(hz): code for code, hz in REPORT_RATE_HZ.items()}
+    if text.lower().removesuffix("hz") not in codes:
+        raise argparse.ArgumentTypeError("use 250, 500 or 1000")
+    return codes[text.lower().removesuffix("hz")]
+
+
 def stick_shape_value(text):
     """'left=square' -> ('left', 'square')."""
     stick, _, shape = text.partition("=")
@@ -433,13 +448,14 @@ def main(argv=None):
     b.add_argument("file")
     st = sub.add_parser("set", help="change one setting (writes to the controller)")
     st.add_argument("setting", choices=["brightness", "color", "deadzone", "hair-trigger",
-                                        "map", "vibration", "stick-shape"])
+                                        "map", "vibration", "stick-shape", "report-rate"])
     st.add_argument("value", help="brightness: 0-100\ncolor: ZONE=#RRGGBB, ZONE in "
                     + ", ".join(LIGHT_ZONES) + "\ndeadzone: left|right|lt|rt=INNER[:OUTER]"
                     "\nhair-trigger: lt|rt=" + "|".join(HAIR_TRIGGER_MODES)
                     + "\nmap: BUTTON=TARGET (BUTTON=BUTTON resets it; L4/R4=nothing)"
                     + "\nvibration: LEVEL | left=LEVEL | right=LEVEL (0-4)"
-                    + "\nstick-shape: left|right=circle|square")
+                    + "\nstick-shape: left|right=circle|square"
+                    + "\nreport-rate: 250|500|1000 (Hz)")
     st.add_argument("--plan", action="store_true",
                     help="map L4/R4: read the controller, print the writes, write nothing")
     st.add_argument("--profile", type=profile_bank, metavar="1-4|shift",
@@ -473,7 +489,8 @@ def main(argv=None):
                           "hair-trigger": hair_trigger_value,
                           "map": map_value,
                           "vibration": vibration_value,
-                          "stick-shape": stick_shape_value}[args.setting](args.value)
+                          "stick-shape": stick_shape_value,
+                          "report-rate": report_rate_value}[args.setting](args.value)
         except (argparse.ArgumentTypeError, ValueError) as e:
             ap.error(f"set {args.setting}: {e}")
 

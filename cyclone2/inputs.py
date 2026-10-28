@@ -15,7 +15,7 @@ import threading
 import time
 from pathlib import Path
 
-EV_ABS = 0x03
+EV_SYN, SYN_REPORT, EV_ABS = 0x00, 0x00, 0x03
 ABS_X, ABS_Y, ABS_Z, ABS_RX, ABS_RY, ABS_RZ = 0, 1, 2, 3, 4, 5
 EVENT = struct.Struct("<qqHHi")           # struct input_event on 64-bit Linux
 ABSINFO = struct.Struct("<6i")            # value, minimum, maximum, fuzz, flat, resolution
@@ -41,6 +41,7 @@ class AxisReader:
             value, lo, hi, *_ = ABSINFO.unpack(buf)
             self.info[code], self.values[code] = (lo, hi), value
         self.error = None
+        self.reports = []                 # timestamps of recent input reports (SYN_REPORT)
         self.stop = threading.Event()
         threading.Thread(target=self._run, daemon=True).start()
 
@@ -51,9 +52,13 @@ class AxisReader:
                     continue
                 data = os.read(self.fd, EVENT.size * 64)
                 for i in range(0, len(data) - EVENT.size + 1, EVENT.size):
-                    _, _, etype, code, value = EVENT.unpack_from(data, i)
+                    sec, usec, etype, code, value = EVENT.unpack_from(data, i)
                     if etype == EV_ABS and code in self.info:
                         self.values[code] = value
+                    elif etype == EV_SYN and code == SYN_REPORT:
+                        self.reports.append(sec + usec / 1e6)
+                        if len(self.reports) > 4000:
+                            del self.reports[:2000]
         except OSError as e:          # unplugged
             self.error = e
         finally:
@@ -61,6 +66,15 @@ class AxisReader:
 
     def close(self):
         self.stop.set()
+
+    def rate(self, window=1.0):
+        """Input reports per second over the last `window` seconds. Reports are
+        only produced when something changes, so keep a stick moving."""
+        times = self.reports[-4000:]
+        if len(times) < 2:
+            return 0
+        recent = [t for t in times if t >= times[-1] - window]
+        return round((len(recent) - 1) / window)
 
     def _norm(self, code, signed=True):
         if code not in self.info:

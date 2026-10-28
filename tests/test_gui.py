@@ -178,3 +178,13 @@ class ShapePlans(unittest.TestCase):
         items = gui.plan_settings(FakeDev(), 0x1053, {"profile": 1,
                                   "sticks": {"right": {"shape": "square"}}}).items
         self.assertEqual([i["packet"] for i in items], ["0f 03 01 02 47 01 01"])
+
+
+class RatePlans(unittest.TestCase):
+    def test_rate(self):
+        s = gui.read_state(FakeDev(), 0x1053)
+        self.assertEqual(s["report_rate"], 1000)
+        items = gui.plan_settings(FakeDev(), 0x1053, {"profile": 1, "report_rate": 250}).items
+        self.assertEqual([i["packet"] for i in items], ["0f 03 01 00 2e 01 00"])
+        with self.assertRaises(DeviceError):
+            gui.plan_settings(FakeDev(), 0x1053, {"profile": 1, "report_rate": 125})
