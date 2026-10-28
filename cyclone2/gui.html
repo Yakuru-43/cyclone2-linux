@@ -43,7 +43,17 @@ main { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr
 .row { display: grid; grid-template-columns: 110px 1fr 42px; align-items: center; gap: 10px;
        padding: 5px 0; }
 .row label { color: var(--muted); }
-.row .val { text-align: right; font-variant-numeric: tabular-nums; }
+.row .val { width: 52px; text-align: right; font: inherit; font-variant-numeric: tabular-nums;
+            color: inherit; background: transparent; border: 1px solid transparent;
+            border-radius: 6px; padding: 2px 4px; -moz-appearance: textfield; }
+.row .val::-webkit-inner-spin-button { -webkit-appearance: none; }
+.row .val:hover { border-color: var(--line); }
+.row .val:focus { border-color: var(--accent); outline: none; background: var(--card); }
+.row { grid-template-columns: 110px 1fr 56px; }
+.pick { display: flex; align-items: center; gap: 8px; }
+.hex { width: 84px; font: 12px var(--mono); color: inherit; background: transparent; text-transform: uppercase;
+       border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.hex:focus { border-color: var(--accent); outline: none; }
 .row.changed label { color: var(--changed); }
 .row.changed label::after { content: " •"; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
@@ -208,9 +218,20 @@ function refreshPending() {
 
 // ---- rendering -------------------------------------------------------------
 function slider(label, path, min, max, onInput) {
-  const val = el("span", { class: "val" }, String(current(path)));
   const input = el("input", { type: "range", min, max, value: current(path) });
-  input.oninput = () => { val.textContent = input.value; setEdit(path, +input.value); onInput?.(); };
+  const val = el("input", { type: "number", class: "val", min, max, step: 1, value: current(path),
+                            title: `Type a value (${min}–${max}) and press Enter` });
+  const commit = (v) => {                       // clamp, then sync both controls
+    v = Math.round(Number(v));
+    if (!Number.isFinite(v)) v = current(path);
+    v = Math.min(max, Math.max(min, v));
+    input.value = val.value = v; setEdit(path, v); onInput?.();
+  };
+  input.oninput = () => commit(input.value);
+  val.onchange = () => commit(val.value);
+  val.onkeydown = (e) => { if (e.key === "Enter") { commit(val.value); val.blur(); }
+                           if (e.key === "Escape") { val.value = current(path); val.blur(); } };
+  val.onfocus = () => val.select();
   return el("div", { class: "row", "data-path": JSON.stringify(path) }, el("label", {}, label), input, val);
 }
 function deadzone(title, group, name) {
@@ -256,9 +277,20 @@ function render() {
   for (const [zone, label] of Object.entries(s.zones)) {
     const path = ["light", "colors", zone];
     const input = el("input", { type: "color", value: current(path) });
-    input.oninput = () => setEdit(path, input.value);
-    light.append(el("div", { class: "row", "data-path": JSON.stringify(path) },
-                    el("label", {}, label), input, el("span")));
+    const hex = el("input", { type: "text", class: "hex", value: current(path), maxlength: 7,
+                              spellcheck: "false", title: "Type a colour as #RRGGBB and press Enter" });
+    const commit = (v) => {
+      v = v.trim().toLowerCase(); if (!v.startsWith("#")) v = "#" + v;
+      if (/^#[0-9a-f]{3}$/.test(v)) v = "#" + [...v.slice(1)].map((c) => c + c).join("");
+      if (!/^#[0-9a-f]{6}$/.test(v)) { hex.value = current(path); toast("Use a colour like #FF0500", true); return; }
+      input.value = hex.value = v; setEdit(path, v);
+    };
+    input.oninput = () => { hex.value = input.value; setEdit(path, input.value); };
+    hex.onchange = () => commit(hex.value);
+    hex.onkeydown = (e) => { if (e.key === "Enter") { commit(hex.value); hex.blur(); } };
+    hex.onfocus = () => hex.select();
+    light.append(el("div", { class: "row color", "data-path": JSON.stringify(path) },
+                    el("label", {}, label), el("div", { class: "pick" }, input, hex), el("span")));
   }
 
   const sticks = el("section", { class: "card" }, el("h2", {}, "Sticks"),
