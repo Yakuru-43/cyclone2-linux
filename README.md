@@ -33,7 +33,7 @@ XInput mode.
 | Switch the active profile | `profile` | on device |
 | Vibration strength | `set vibration` | on device, by feel |
 | Stick shape (circle / square) | `set stick-shape` | on device, Stick test |
-| Polling rate (250 / 500 / 1000 Hz) | `set report-rate` | 250/1000 confirmed; 500 pending |
+| Polling rate (250 / 500 / 1000 Hz) | `set report-rate` (GUI: Controller) | on device, measured |
 
 It also works through the **2.4 GHz dongle** (3537:100b; tested: info, full
 read, brightness write). Commands are paced, because the radio occasionally

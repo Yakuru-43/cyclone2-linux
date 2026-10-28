@@ -322,7 +322,7 @@ TRI = Y, PS = Home, Sel = View, Sta = Menu, Camera = Share, FL1/FR1 = L4/R4.
 | 0x029 / 0x02A | shift enable / shift value | |
 | 0x02B | D-pad diagonal lock | bit 0 |
 | 0x02C / 0x02D | XInput / Switch ABXY swap | bit 0 |
-| 0x02E | report rate | 0 = 250 Hz, 1 = 500, 2 = 1000. **Confirmed:** the factory value 2 showed as 1000 Hz in GSC, and clicking 250 Hz → 1000 Hz wrote `00`, then `02` (GSC debug log, 2026-10-26 20:51; the proxy capture of this was deleted by mistake) |
+| 0x02E | report rate | 0 = 250 Hz, 1 = 500, 2 = 1000. **All three confirmed.** 500/1000 by measurement on 2026-10-28: with the GUI's report-rate meter (xpad SYN_REPORT events per second while moving a stick), 1 gave 499 Hz and 2 gave 999 Hz. Earlier: the factory value 2 showed as 1000 Hz in GSC, and clicking 250 Hz → 1000 Hz wrote `00`, then `02` (GSC debug log, 2026-10-26 20:51; the proxy capture of this was deleted by mistake) |
 | 0x02F–0x03F | reserved | |
 
 ### 4.4 Key block (7 bytes)
